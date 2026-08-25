@@ -8,6 +8,10 @@ const BankLinkSchema = new mongoose.Schema(
     vua: { type: String, required: true },
     consentId: { type: String, default: null },
     consentStatus: { type: String, enum: ["PENDING", "ACTIVE", "REJECTED", "EXPIRED", "REVOKED", "PAUSED"], default: "PENDING" },
+    consentDataRange: {
+      from: { type: String, default: null },
+      to: { type: String, default: null },
+    },
     dataSessionId: { type: String, default: null },
     dataSessionStatus: { type: String, enum: ["PENDING", "PARTIAL", "COMPLETED", "FAILED"], default: null },
     accountId: { type: mongoose.Schema.Types.ObjectId, ref: "Account", default: null },

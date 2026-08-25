@@ -21,7 +21,7 @@ export async function POST(request) {
         await link.save();
 
         if (consent.status === "ACTIVE" && !link.dataSessionId) {
-          const session = await createDataSession(link.consentId);
+          const session = await createDataSession(link.consentId, link.consentDataRange);
           link.dataSessionId = session.id;
           link.dataSessionStatus = session.status;
           await link.save();

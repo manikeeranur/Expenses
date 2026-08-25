@@ -24,7 +24,13 @@ export default function BankLinkStatusFlow({ link: initialLink }) {
     startChecking(async () => {
       const res = await checkBankLinkStatus(link._id);
       if (res?.error) setError(res.error);
-      else setLink((l) => ({ ...l, consentStatus: res.consentStatus, dataSessionStatus: res.dataSessionStatus }));
+      else
+        setLink((l) => ({
+          ...l,
+          consentStatus: res.consentStatus,
+          dataSessionStatus: res.dataSessionStatus,
+          accountId: res.accountId || l.accountId,
+        }));
     });
   }
 
