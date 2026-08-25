@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Landmark } from "lucide-react";
+import { Landmark, ShieldCheck } from "lucide-react";
 import { getIcon } from "@/lib/icons";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
@@ -18,10 +18,26 @@ export default async function AccountsPage() {
     <Screen>
       <header className="flex items-center justify-between px-5 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Accounts</h1>
-        <AccountForm action={createAccount} />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/accounts/link"
+            aria-label="Link real bank account"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-light text-primary"
+          >
+            <ShieldCheck size={16} />
+          </Link>
+          <AccountForm action={createAccount} />
+        </div>
       </header>
 
-      <div className="hidden justify-end px-5 pt-3 md:flex md:px-8 md:pt-6">
+      <div className="hidden items-center justify-end gap-2 px-5 pt-3 md:flex md:px-8 md:pt-6">
+        <Link
+          href="/accounts/link"
+          className="flex items-center gap-1.5 rounded-full bg-primary-light px-4 py-2 text-xs font-semibold text-primary-dark"
+        >
+          <ShieldCheck size={14} />
+          Link Real Bank Account
+        </Link>
         <AccountForm action={createAccount} />
       </div>
 
