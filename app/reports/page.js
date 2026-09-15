@@ -15,14 +15,14 @@ export default async function ReportsPage() {
   const monthLabel = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
   return (
-    <Screen>
-      <header className="flex items-center justify-between px-5 pb-2 pt-6 md:hidden">
+    <Screen wide>
+      <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Reports</h1>
         <span className="text-sm font-semibold">{monthLabel}</span>
       </header>
 
-      <div className="px-5 pt-3">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="px-4 pt-3">
+        <div className="grid grid-cols-2 gap-4">
           <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
             <p className="text-xs text-muted">Total Expenses</p>
             <p className="mt-1 text-lg font-bold">{formatCurrency(totalExpenses)}</p>

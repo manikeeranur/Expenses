@@ -16,13 +16,13 @@ export default async function InsightsPage() {
   const insights = await getInsights(userId);
 
   return (
-    <Screen>
-      <header className="px-5 pb-2 pt-6 md:hidden">
+    <Screen wide>
+      <header className="px-4 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Insights</h1>
         <p className="mt-1 text-sm text-muted">Smart observations from your spending this month</p>
       </header>
 
-      <div className="space-y-3 px-5 pt-3">
+      <div className="space-y-4 px-4 pt-3">
         {insights.map((i) => {
           const Icon = getIcon(i.icon);
           return (

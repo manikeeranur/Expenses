@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IconHome2, IconReceipt2, IconChartPie, IconCoinRupee, IconUserCircle } from "@tabler/icons-react";
 import { Plus } from "lucide-react";
+import AddTransactionModal from "@/components/AddTransactionModal";
 
 const items = [
   { href: "/dashboard", label: "Home", icon: IconHome2 },
@@ -25,13 +26,18 @@ export default function BottomNav() {
           if (isFab) {
             return (
               <li key={href} className="-mt-6">
-                <Link
-                  href={href}
-                  aria-label={label}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/30"
-                >
-                  <Icon size={26} strokeWidth={2.5} />
-                </Link>
+                <AddTransactionModal>
+                  {(open) => (
+                    <button
+                      type="button"
+                      onClick={open}
+                      aria-label={label}
+                      className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/30"
+                    >
+                      <Icon size={26} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </AddTransactionModal>
               </li>
             );
           }

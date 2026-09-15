@@ -15,8 +15,8 @@ export default async function GoalsPage() {
   const totalTarget = goals.reduce((s, g) => s + g.target, 0);
 
   return (
-    <Screen>
-      <header className="flex items-center justify-between px-5 pb-2 pt-6 md:hidden">
+    <Screen wide>
+      <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Goals</h1>
         <Link
           href="/goals/new"
@@ -28,7 +28,7 @@ export default async function GoalsPage() {
       </header>
 
       {goals.length ? (
-        <div className="px-5 pt-3">
+        <div className="px-4 pt-3">
           <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
             <p className="text-xs text-muted">Total Saved Across Goals</p>
             <p className="mt-1 text-xl font-bold">
@@ -40,7 +40,7 @@ export default async function GoalsPage() {
             </div>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-4">
             {goals.map((g) => {
               const pct = Math.round((g.saved / g.target) * 100);
               return (

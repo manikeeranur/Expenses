@@ -14,14 +14,14 @@ export default async function RecurringPage() {
   const [payments, categories] = await Promise.all([getRecurringPayments(userId), getCategories(userId)]);
 
   return (
-    <Screen>
-      <header className="flex items-center justify-between px-5 pb-2 pt-6 md:hidden">
+    <Screen wide>
+      <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Recurring Payments</h1>
         <RecurringForm action={createRecurring} categories={categories} />
       </header>
 
       {payments.length ? (
-        <div className="space-y-2.5 px-5 pt-3">
+        <div className="space-y-4 px-4 pt-3">
           {payments.map((r) => {
             const deleteWithId = deleteRecurring.bind(null, r._id);
             return (

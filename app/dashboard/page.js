@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { Bell, TrendingDown, TrendingUp, PiggyBank, Target, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Bell, TrendingDown, TrendingUp, PiggyBank, Target } from "lucide-react";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
 import StatCard from "@/components/ui/StatCard";
 import CategoryIcon from "@/components/ui/CategoryIcon";
 import ExpenseAreaChart from "@/components/charts/ExpenseAreaChart";
 import CategoryDonut from "@/components/charts/CategoryDonut";
-import TransactionRow from "@/components/TransactionRow";
 import { formatCurrency } from "@/lib/format";
 import { requireUserId } from "@/lib/session";
 import { getDashboardSummary, getExpenseTrendForMonth, getTransactions, getNotifications } from "@/lib/data";
@@ -26,8 +25,8 @@ export default async function DashboardPage() {
   const monthLabel = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
   return (
-    <Screen>
-      <header className="flex items-center justify-between px-5 pb-2 pt-6 md:hidden">
+    <Screen wide>
+      <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
         <span className="text-sm font-semibold">{monthLabel}</span>
         <Link
           href="/notifications"
@@ -39,8 +38,8 @@ export default async function DashboardPage() {
         </Link>
       </header>
 
-      <div className="space-y-5 px-5 pt-3 md:px-8 md:pt-6">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="space-y-4 px-4 pt-3 md:pt-6">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard
             icon={<TrendingDown size={16} className="text-primary" />}
             label="Total Expenses"
@@ -66,25 +65,8 @@ export default async function DashboardPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Link
-            href="/pay/send"
-            className="flex items-center justify-center gap-2 rounded-2xl bg-surface py-3.5 text-sm font-semibold shadow-sm shadow-black/[0.03]"
-          >
-            <ArrowUpRight size={16} className="text-danger" />
-            Send Money
-          </Link>
-          <Link
-            href="/pay/receive"
-            className="flex items-center justify-center gap-2 rounded-2xl bg-surface py-3.5 text-sm font-semibold shadow-sm shadow-black/[0.03]"
-          >
-            <ArrowDownLeft size={16} className="text-success" />
-            Receive Money
-          </Link>
-        </div>
-
-        <div className="lg:grid lg:grid-cols-5 lg:items-start lg:gap-5 space-y-5 lg:space-y-0">
-          <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03] lg:col-span-3">
+        <div className="lg:grid lg:grid-cols-5 lg:gap-4 space-y-4 lg:space-y-0">
+          <div className="flex flex-col rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03] lg:col-span-3">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold">Expenses Overview</h2>
@@ -92,14 +74,16 @@ export default async function DashboardPage() {
               </div>
               <span className="text-xs text-muted">This Month</span>
             </div>
-            {expenseTrend.length ? (
-              <ExpenseAreaChart data={expenseTrend} />
-            ) : (
-              <p className="py-10 text-center text-xs text-muted">No expenses recorded yet this month.</p>
-            )}
+            <div className="mt-2 min-h-[220px] flex-1">
+              {expenseTrend.length ? (
+                <ExpenseAreaChart data={expenseTrend} />
+              ) : (
+                <p className="py-10 text-center text-xs text-muted">No expenses recorded yet this month.</p>
+              )}
+            </div>
           </div>
 
-          <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03] lg:col-span-2">
+          <div className="flex flex-col rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03] lg:col-span-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold">Expense by Category</h2>
               <span className="text-xs text-muted">This Month</span>
@@ -128,7 +112,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="md:grid md:grid-cols-2 md:items-start md:gap-5 md:space-y-0 space-y-5">
+        <div className="md:grid md:grid-cols-2 md:items-start md:gap-4 md:space-y-0 space-y-4">
           <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold">Recent Transactions</h2>
@@ -136,13 +120,33 @@ export default async function DashboardPage() {
                 View All
               </Link>
             </div>
-            <div className="mt-3 space-y-2.5">
-              {recent.length ? (
-                recent.map((t) => <TransactionRow key={t._id} transaction={t} />)
-              ) : (
-                <p className="text-center text-xs text-muted">No transactions yet.</p>
-              )}
-            </div>
+            {recent.length ? (
+              <ul className="mt-3 space-y-3">
+                {recent.map((t) => {
+                  const isIncome = t.type === "income";
+                  const category = t.categoryId;
+                  return (
+                    <li key={t._id} className="flex items-center gap-3">
+                      <CategoryIcon
+                        icon={isIncome ? "Landmark" : category?.icon}
+                        color={isIncome ? "#21C37E" : category?.color || "#9AA0B4"}
+                        size="sm"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm">{t.title}</p>
+                        <p className="truncate text-xs text-muted">{isIncome ? "Income" : category?.name || "Uncategorized"}</p>
+                      </div>
+                      <span className={`shrink-0 text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
+                        {isIncome ? "+" : "-"}
+                        {formatCurrency(t.amount)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="mt-4 text-center text-xs text-muted">No transactions yet.</p>
+            )}
           </div>
 
           <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">

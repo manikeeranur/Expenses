@@ -30,14 +30,14 @@ export default async function NotificationsPage() {
   const hasUnread = notifications.some((n) => !n.read);
 
   return (
-    <Screen>
-      <header className="flex items-center justify-between px-5 pb-2 pt-6 md:hidden">
+    <Screen wide>
+      <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Notifications</h1>
         {hasUnread ? <MarkAllReadButton /> : null}
       </header>
 
       {notifications.length ? (
-        <div className="space-y-2.5 px-5 pt-3">
+        <div className="space-y-4 px-4 pt-3">
           {notifications.map((n) => {
             const Icon = getIcon(typeIcon[n.type] || "Bell");
             const markRead = markNotificationRead.bind(null, n._id);

@@ -3,7 +3,6 @@ import {
   ChevronRight,
   User,
   SlidersHorizontal,
-  Link2,
   Download,
   RefreshCw,
   HelpCircle,
@@ -20,7 +19,6 @@ const menuGroups = [
     items: [
       { icon: User, label: "Personal Information", href: "/settings" },
       { icon: SlidersHorizontal, label: "Preferences", href: "/settings" },
-      { icon: Link2, label: "Linked Accounts", href: "/accounts" },
     ],
   },
   {
@@ -43,12 +41,12 @@ export default async function ProfilePage() {
   const initial = user?.name?.charAt(0)?.toUpperCase() || "?";
 
   return (
-    <Screen>
-      <header className="px-5 pb-2 pt-6">
+    <Screen wide>
+      <header className="px-4 pb-2 pt-6">
         <h1 className="text-xl font-bold">Profile</h1>
       </header>
 
-      <div className="px-5 pt-3">
+      <div className="px-4 pt-3">
         <Link href="/settings" className="flex items-center gap-4 rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-lg font-bold text-white">
             {initial}

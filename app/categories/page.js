@@ -15,17 +15,17 @@ export default async function CategoriesPage() {
   const categories = [...categoriesWithSpend].sort((a, b) => b.spent - a.spent);
 
   return (
-    <Screen>
-      <header className="flex items-center justify-between px-5 pb-2 pt-6 md:hidden">
+    <Screen wide>
+      <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Categories</h1>
         <CategoryForm mode="create" action={createCategory} />
       </header>
 
-      <div className="hidden justify-end px-5 pt-3 md:flex md:px-8 md:pt-6">
+      <div className="hidden justify-end px-4 pt-3 md:flex md:pt-6">
         <CategoryForm mode="create" action={createCategory} />
       </div>
 
-      <div className="space-y-2.5 px-5 pt-3 md:px-8">
+      <div className="space-y-4 px-4 pt-3">
         {categories.map((c) => (
           <Link
             key={c._id}

@@ -11,15 +11,14 @@ import {
   IconTarget,
   IconCoinRupee,
   IconRepeat,
-  IconBuildingBank,
   IconCalendar,
   IconBulb,
   IconBell,
   IconSettings,
-  IconQrcode,
 } from "@tabler/icons-react";
 import { Plus, Wallet, PiggyBank } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
+import AddTransactionModal from "@/components/AddTransactionModal";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: IconHome2 },
@@ -30,8 +29,6 @@ const navItems = [
   { href: "/goals", label: "Goals", icon: IconTarget },
   { href: "/lending", label: "Lending", icon: IconCoinRupee },
   { href: "/recurring", label: "Recurring", icon: IconRepeat },
-  { href: "/accounts", label: "Accounts", icon: IconBuildingBank },
-  { href: "/pay", label: "UPI Pay", icon: IconQrcode },
   { href: "/calendar", label: "Calendar", icon: IconCalendar },
   { href: "/insights", label: "Insights", icon: IconBulb },
   { href: "/notifications", label: "Notifications", icon: IconBell },
@@ -75,13 +72,18 @@ export default function Sidebar() {
           </div>
           <p className="mt-3 text-sm font-bold">Track. Analyze. Save.</p>
           <p className="mt-1 text-xs text-muted">Take control of your finances and achieve your goals.</p>
-          <Link
-            href="/transactions/add"
-            className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-xs font-semibold text-white shadow-md shadow-primary/25"
-          >
-            <Plus size={14} />
-            Add Transaction
-          </Link>
+          <AddTransactionModal>
+            {(open) => (
+              <button
+                type="button"
+                onClick={open}
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-xs font-semibold text-white shadow-md shadow-primary/25"
+              >
+                <Plus size={14} />
+                Add Transaction
+              </button>
+            )}
+          </AddTransactionModal>
         </div>
 
         <div className="mt-2 border-t border-border pt-2">

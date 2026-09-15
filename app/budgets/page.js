@@ -13,13 +13,13 @@ export default async function BudgetsPage() {
   const monthLabel = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
   return (
-    <Screen>
-      <header className="flex items-center justify-between px-5 pb-2 pt-6 md:hidden">
+    <Screen wide>
+      <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Budgets</h1>
         <span className="text-sm font-semibold">{monthLabel}</span>
       </header>
 
-      <div className="px-5 pt-3">
+      <div className="px-4 pt-3">
         <div className="rounded-2xl bg-primary p-5 text-white shadow-lg shadow-primary/25">
           <div className="flex items-center justify-between text-xs text-white/80">
             <span>Overall Budget</span>
@@ -38,7 +38,7 @@ export default async function BudgetsPage() {
           <h2 className="text-sm font-semibold">Monthly Budgets</h2>
         </div>
 
-        <div className="mt-3 space-y-3">
+        <div className="mt-3 space-y-4">
           {categoriesWithSpend.map((c) => {
             const pct = c.budget > 0 ? Math.round((c.spent / c.budget) * 100) : 0;
             const status = pct >= 100 ? "Over Budget" : pct >= 90 ? "Approaching Limit" : "On Track";
