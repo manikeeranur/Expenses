@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconHome2, IconReceipt2, IconChartPie, IconUserCircle } from "@tabler/icons-react";
+import { IconHome2, IconReceipt2, IconChartPie, IconCoinRupee, IconUserCircle } from "@tabler/icons-react";
 import { Plus } from "lucide-react";
 
 const items = [
   { href: "/dashboard", label: "Home", icon: IconHome2 },
   { href: "/transactions", label: "Transactions", icon: IconReceipt2 },
   { href: "/transactions/add", label: "Add", icon: Plus, isFab: true },
+  { href: "/lending", label: "Lending", icon: IconCoinRupee },
   { href: "/reports", label: "Reports", icon: IconChartPie },
   { href: "/profile", label: "Profile", icon: IconUserCircle },
 ];
