@@ -19,7 +19,7 @@ export default function TransactionRow({ transaction }) {
         <p className="truncate text-sm font-semibold">{transaction.title}</p>
         <p className="truncate text-xs text-muted">{isIncome ? "Income" : category?.name || "Uncategorized"}</p>
       </div>
-      <p className={`shrink-0 text-sm font-semibold ${isIncome ? "text-success" : "text-foreground"}`}>
+      <p className={`shrink-0 text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
         {isIncome ? "+" : "-"}
         {formatCurrency(transaction.amount)}
       </p>

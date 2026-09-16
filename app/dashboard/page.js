@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, TrendingDown, TrendingUp, PiggyBank, Target } from "lucide-react";
+import { Bell, TrendingDown, TrendingUp, PiggyBank, Target, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
 import StatCard from "@/components/ui/StatCard";
@@ -63,6 +63,23 @@ export default async function DashboardPage() {
             value={`${summary.budgetStatusPct}%`}
             tone={summary.budgetStatusPct >= 100 ? "danger" : "success"}
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Link
+            href="/pay/send"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-surface py-3.5 text-sm font-semibold shadow-sm shadow-black/[0.03]"
+          >
+            <ArrowUpRight size={16} className="text-danger" />
+            Send Money
+          </Link>
+          <Link
+            href="/pay/receive"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-surface py-3.5 text-sm font-semibold shadow-sm shadow-black/[0.03]"
+          >
+            <ArrowDownLeft size={16} className="text-success" />
+            Receive Money
+          </Link>
         </div>
 
         <div className="lg:grid lg:grid-cols-2 lg:gap-4 space-y-4 lg:space-y-0">

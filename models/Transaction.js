@@ -16,10 +16,16 @@ const TransactionSchema = new mongoose.Schema(
     receiptSize: { type: String, default: null },
     upiId: { type: String, default: null },
     reference: { type: String, default: null },
+    source: { type: String, enum: ["MANUAL", "BANK_SYNC", "CSV_IMPORT"], default: "MANUAL" },
   },
   { timestamps: true }
 );
 
 TransactionSchema.index({ userId: 1, date: -1 });
+// Prevents the same bank transaction being imported twice on a repeated sync.
+TransactionSchema.index(
+  { userId: 1, accountId: 1, reference: 1 },
+  { unique: true, partialFilterExpression: { reference: { $type: "string" } } }
+);
 
 export default mongoose.models.Transaction || mongoose.model("Transaction", TransactionSchema);

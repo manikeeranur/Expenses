@@ -11,10 +11,12 @@ import {
   IconTarget,
   IconCoinRupee,
   IconRepeat,
+  IconBuildingBank,
   IconCalendar,
   IconBulb,
   IconBell,
   IconSettings,
+  IconQrcode,
 } from "@tabler/icons-react";
 import { Plus, Wallet, PiggyBank } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -29,6 +31,8 @@ const navItems = [
   { href: "/goals", label: "Goals", icon: IconTarget },
   { href: "/lending", label: "Lending", icon: IconCoinRupee },
   { href: "/recurring", label: "Recurring", icon: IconRepeat },
+  { href: "/accounts", label: "Accounts", icon: IconBuildingBank },
+  { href: "/pay", label: "UPI Pay", icon: IconQrcode },
   { href: "/calendar", label: "Calendar", icon: IconCalendar },
   { href: "/insights", label: "Insights", icon: IconBulb },
   { href: "/notifications", label: "Notifications", icon: IconBell },

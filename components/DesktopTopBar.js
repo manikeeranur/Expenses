@@ -14,6 +14,8 @@ const PAGES = {
   "/goals": { title: "Goals", subtitle: "Track progress toward your savings goals" },
   "/recurring": { title: "Recurring Payments", subtitle: "Manage subscriptions and bills" },
   "/lending": { title: "Lending", subtitle: "Track money you've lent out" },
+  "/accounts": { title: "Accounts", subtitle: "Manage your linked and manual accounts" },
+  "/pay": { title: "UPI Pay", subtitle: "Send and receive money via UPI" },
   "/calendar": { title: "Calendar", subtitle: "View transactions by date" },
   "/insights": { title: "Insights", subtitle: "Personalized observations on your spending" },
   "/notifications": { title: "Notifications", subtitle: "Stay updated on your finances" },
