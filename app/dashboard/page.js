@@ -65,8 +65,8 @@ export default async function DashboardPage() {
           />
         </div>
 
-        <div className="lg:grid lg:grid-cols-5 lg:gap-4 space-y-4 lg:space-y-0">
-          <div className="flex flex-col rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03] lg:col-span-3">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-4 space-y-4 lg:space-y-0">
+          <div className="flex flex-col rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold">Expenses Overview</h2>
@@ -83,7 +83,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex flex-col rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03] lg:col-span-2">
+          <div className="flex flex-col rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold">Expense by Category</h2>
               <span className="text-xs text-muted">This Month</span>
