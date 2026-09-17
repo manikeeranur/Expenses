@@ -8,6 +8,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import Tag from "@/components/ui/Tag";
 import LendingActionsMenu from "@/components/LendingActionsMenu";
+import DownloadLendingPdf from "@/components/DownloadLendingPdf";
 import LendingForm from "@/components/LendingForm";
 import SendReminderButton from "@/components/SendReminderButton";
 import { formatCurrencyPrecise, formatDateShort, daysSince, ordinal } from "@/lib/format";
@@ -67,6 +68,7 @@ function SortableRow({ l }) {
       </td>
       <td className="py-3">
         <div className="flex items-center justify-end">
+          <DownloadLendingPdf lending={l} />
           <LendingActionsMenu
             isClosed={l.status === "closed"}
             statusAction={setLendingStatus.bind(null, l._id, l.status === "closed" ? "active" : "closed")}

@@ -14,6 +14,13 @@ function pad(n) {
   return String(n).padStart(2, "0");
 }
 
+function compactAmount(n) {
+  const abs = Math.abs(n);
+  if (abs >= 100000) return `${(abs / 100000).toFixed(1).replace(/\.0$/, "")}L`;
+  if (abs >= 1000) return `${(abs / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return `${Math.round(abs)}`;
+}
+
 export default function CalendarGrid({ year, month, eventsByDate, todayKey }) {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -31,24 +38,35 @@ export default function CalendarGrid({ year, month, eventsByDate, todayKey }) {
         ))}
       </div>
 
-      <div className="mt-1 grid grid-cols-7 gap-y-2 text-center">
+      <div className="mt-1 grid grid-cols-7 gap-1 text-center">
         {cells.map((day, i) => {
           if (!day) return <span key={i} />;
           const dateKey = `${year}-${pad(month + 1)}-${pad(day)}`;
-          const hasEvent = !!eventsByDate[dateKey];
+          const dayEvents = eventsByDate[dateKey];
+          const hasEvent = !!dayEvents;
           const isSelected = dateKey === selected;
           const isToday = dateKey === todayKey;
+          const dayNet = hasEvent ? dayEvents.reduce((s, e) => s + (e.type === "income" ? e.amount : -e.amount), 0) : 0;
           return (
             <button
               key={i}
               type="button"
               onClick={() => setSelected(dateKey)}
-              className={`relative mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+              className={`mx-auto flex aspect-square w-full max-w-14 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-medium transition-colors ${
                 isSelected ? "bg-primary text-white" : isToday ? "border border-primary text-primary" : "text-foreground hover:bg-background"
               }`}
             >
-              {day}
-              {hasEvent && !isSelected ? <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-primary" /> : null}
+              <span>{day}</span>
+              {hasEvent ? (
+                <span
+                  className={`text-[9px] font-semibold leading-none ${
+                    isSelected ? "text-white/90" : dayNet >= 0 ? "text-success" : "text-danger"
+                  }`}
+                >
+                  {dayNet >= 0 ? "+" : "-"}
+                  {compactAmount(dayNet)}
+                </span>
+              ) : null}
             </button>
           );
         })}
