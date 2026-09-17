@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Inbox, Plus, TrendingUp, TrendingDown, Wallet, BarChart3 } from "lucide-react";
+import { Inbox, Plus, TrendingUp, TrendingDown, Wallet, BarChart3, IndianRupee } from "lucide-react";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
 import CategoryIcon from "@/components/ui/CategoryIcon";
@@ -32,25 +32,17 @@ function StatCard({ icon, tone, label, value, valueClassName = "" }) {
   );
 }
 
-function TransactionTable({ title, totalLabel, totalTone, transactions, emptyLabel, type }) {
-  const total = transactions.reduce((s, t) => s + t.amount, 0);
-
+function TransactionTable({ transactions, net }) {
   return (
     <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
       <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-            totalTone === "success" ? "bg-success-light text-success" : "bg-danger-light text-danger"
-          }`}
-        >
-          {totalTone === "success" ? <TrendingUp size={17} /> : <TrendingDown size={17} />}
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-light text-primary">
+          <IndianRupee size={17} />
         </span>
-        <h2 className="flex-1 text-sm font-bold">{title}</h2>
+        <h2 className="flex-1 text-sm font-bold">All Transactions</h2>
         <span className="flex items-center gap-2 rounded-full bg-background px-3 py-1.5">
-          <span className="text-[11px] text-muted">{totalLabel}</span>
-          <span className={`text-xs font-bold ${totalTone === "success" ? "text-success" : "text-danger"}`}>
-            {formatCurrencyPrecise(total)}
-          </span>
+          <span className="text-[11px] text-muted">Net</span>
+          <span className={`text-xs font-bold ${net >= 0 ? "text-success" : "text-danger"}`}>{formatCurrencyPrecise(net)}</span>
         </span>
       </div>
 
@@ -114,10 +106,10 @@ function TransactionTable({ title, totalLabel, totalTone, transactions, emptyLab
           </table>
         </div>
       ) : (
-        <p className="mt-3 rounded-xl bg-background p-4 text-center text-xs text-muted">{emptyLabel}</p>
+        <p className="mt-3 rounded-xl bg-background p-4 text-center text-xs text-muted">No transactions yet.</p>
       )}
 
-      <DownloadTransactionsPdf type={type} />
+      <DownloadTransactionsPdf />
     </div>
   );
 }
@@ -129,10 +121,8 @@ export default async function TransactionsPage() {
     getMonthlyIncomeExpense(userId, 6),
   ]);
 
-  const income = transactions.filter((t) => t.type === "income");
-  const expenses = transactions.filter((t) => t.type === "expense");
-  const totalIncome = income.reduce((s, t) => s + t.amount, 0);
-  const totalExpenses = expenses.reduce((s, t) => s + t.amount, 0);
+  const totalIncome = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalExpenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
   const net = totalIncome - totalExpenses;
 
   return (
@@ -152,18 +142,18 @@ export default async function TransactionsPage() {
         <div className="space-y-4 px-4 pt-3 md:px-8 md:pt-6">
           <div className="grid grid-cols-3 gap-4">
             <StatCard
-              icon={<TrendingUp size={18} />}
-              tone="success"
-              label="Total Income"
-              value={formatCurrency(totalIncome)}
-              valueClassName="text-success"
-            />
-            <StatCard
               icon={<TrendingDown size={18} />}
               tone="danger"
-              label="Total Expenses"
+              label="Total Debit"
               value={formatCurrency(totalExpenses)}
               valueClassName="text-danger"
+            />
+            <StatCard
+              icon={<TrendingUp size={18} />}
+              tone="success"
+              label="Total Credit"
+              value={formatCurrency(totalIncome)}
+              valueClassName="text-success"
             />
             <StatCard
               icon={<Wallet size={18} />}
@@ -186,23 +176,7 @@ export default async function TransactionsPage() {
             </div>
           </div>
 
-          <TransactionTable
-            title="Income Transactions"
-            totalLabel="Total Income"
-            totalTone="success"
-            transactions={income}
-            emptyLabel="No income transactions yet."
-            type="income"
-          />
-
-          <TransactionTable
-            title="Expense Transactions"
-            totalLabel="Total Expenses"
-            totalTone="danger"
-            transactions={expenses}
-            emptyLabel="No expense transactions yet."
-            type="expense"
-          />
+          <TransactionTable transactions={transactions} net={net} />
         </div>
       ) : (
         <div className="flex flex-col items-center px-8 pt-24 text-center">

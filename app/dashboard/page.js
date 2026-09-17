@@ -15,11 +15,11 @@ export default async function DashboardPage() {
   const [summary, expenseTrend, recent, notifications] = await Promise.all([
     getDashboardSummary(userId),
     getExpenseTrendForMonth(userId),
-    getTransactions(userId, { limit: 3 }),
+    getTransactions(userId, { limit: 5 }),
     getNotifications(userId),
   ]);
 
-  const topCategories = [...summary.categoriesWithSpend].sort((a, b) => b.spent - a.spent).slice(0, 4);
+  const topCategories = [...summary.categoriesWithSpend].sort((a, b) => b.spent - a.spent).slice(0, 5);
   const spendingCategories = summary.categoriesWithSpend.filter((c) => c.spent > 0).sort((a, b) => b.spent - a.spent);
   const unread = notifications.some((n) => !n.read);
   const monthLabel = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
@@ -129,7 +129,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="md:grid md:grid-cols-2 md:items-start md:gap-4 md:space-y-0 space-y-4">
+        <div className="md:grid md:grid-cols-2 md:gap-4 md:space-y-0 space-y-4">
           <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold">Recent Transactions</h2>
