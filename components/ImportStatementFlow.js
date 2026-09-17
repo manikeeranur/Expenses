@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Upload, FileSpreadsheet, Check, AlertTriangle } from "lucide-react";
 import { parseCsv, mapBankRows } from "@/lib/csv";
 import { importTransactions } from "@/lib/actions/accounts";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDateShort } from "@/lib/format";
 
 export default function ImportStatementFlow({ accountId }) {
   const [fileName, setFileName] = useState(null);
@@ -95,7 +95,7 @@ export default function ImportStatementFlow({ accountId }) {
               <div key={i} className="flex items-center gap-3 rounded-xl bg-surface p-3 shadow-sm shadow-black/[0.03]">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-medium">{r.title}</p>
-                  <p className="text-[11px] text-muted">{formatDate(r.date, { day: "numeric", month: "short", year: "numeric" })}</p>
+                  <p className="text-[11px] text-muted">{formatDateShort(r.date)}</p>
                 </div>
                 <p className={`shrink-0 text-xs font-semibold ${r.type === "income" ? "text-success" : "text-danger"}`}>
                   {r.type === "income" ? "+" : "-"}

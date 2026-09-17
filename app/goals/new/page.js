@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
+import DatePicker from "@/components/ui/DatePicker";
 import { createGoal } from "@/lib/actions/goals";
 
 const ICONS = [
@@ -48,12 +49,7 @@ export default function NewGoalPage() {
 
         <div>
           <label className="text-xs font-medium text-muted">Target Date</label>
-          <input
-            name="dueDate"
-            type="date"
-            required
-            className="mt-1.5 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
-          />
+          <DatePicker name="dueDate" required className="mt-1.5" />
         </div>
 
         <div>

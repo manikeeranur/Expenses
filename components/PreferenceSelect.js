@@ -2,22 +2,27 @@
 
 import { useTransition } from "react";
 import { updatePreference } from "@/lib/actions/settings";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 export default function PreferenceSelect({ prefKey, defaultValue, options }) {
   const [pending, startTransition] = useTransition();
 
   return (
-    <select
+    <Select
       defaultValue={defaultValue}
       disabled={pending}
-      onChange={(e) => startTransition(() => updatePreference(prefKey, e.target.value))}
-      className="bg-transparent text-right text-sm text-muted outline-none disabled:opacity-60"
+      onValueChange={(value) => startTransition(() => updatePreference(prefKey, value))}
     >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger variant="bare" className="w-auto justify-end gap-1.5 text-sm text-muted disabled:opacity-60">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent align="end">
+        {options.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

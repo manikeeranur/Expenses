@@ -4,7 +4,7 @@ import BottomNav from "@/components/BottomNav";
 import CategoryIcon from "@/components/ui/CategoryIcon";
 import RecurringForm from "@/components/RecurringForm";
 import DeleteButton from "@/components/ui/DeleteButton";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDateShort } from "@/lib/format";
 import { requireUserId } from "@/lib/session";
 import { getRecurringPayments, getCategories } from "@/lib/data";
 import { createRecurring, deleteRecurring } from "@/lib/actions/recurring";
@@ -15,8 +15,9 @@ export default async function RecurringPage() {
 
   return (
     <Screen wide>
-      <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
-        <h1 className="text-xl font-bold">Recurring Payments</h1>
+      <header className="flex items-center justify-between px-4 pb-2 pt-6 md:px-8">
+        <h1 className="text-xl font-bold md:hidden">Recurring Payments</h1>
+        <span className="hidden md:block" />
         <RecurringForm action={createRecurring} categories={categories} />
       </header>
 
@@ -33,7 +34,7 @@ export default async function RecurringPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold">{formatCurrency(r.amount)}</p>
-                  <p className="text-[11px] text-muted">Next {formatDate(r.nextDate, { day: "numeric", month: "short" })}</p>
+                  <p className="text-[11px] text-muted">Next {formatDateShort(r.nextDate)}</p>
                 </div>
                 <DeleteButton action={deleteWithId} label="Delete recurring payment" />
               </div>

@@ -1,6 +1,6 @@
 import { Bell } from "lucide-react";
 import { getIcon } from "@/lib/icons";
-import { formatDate } from "@/lib/format";
+import { formatDateShort } from "@/lib/format";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
 import MarkAllReadButton from "@/components/MarkAllReadButton";
@@ -57,7 +57,7 @@ export default async function NotificationsPage() {
                       {!n.read ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" /> : null}
                     </div>
                     <p className="mt-0.5 text-xs text-muted">{n.message}</p>
-                    <p className="mt-1 text-[11px] text-muted">{formatDate(n.createdAt, { day: "numeric", month: "short" })}</p>
+                    <p className="mt-1 text-[11px] text-muted">{formatDateShort(n.createdAt)}</p>
                   </div>
                 </button>
               </form>

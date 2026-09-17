@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Download } from "lucide-react";
+import DatePicker from "@/components/ui/DatePicker";
 
 function toCsv(rows) {
   const header = ["Date", "Title", "Type", "Category", "Amount", "Account", "Method", "Tags", "Description"];
@@ -64,21 +65,11 @@ export default function ExportForm({ transactions }) {
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-surface px-4 py-3 shadow-sm shadow-black/[0.03]">
             <label className="text-[11px] text-muted">From</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="mt-1 w-full bg-transparent text-sm font-medium outline-none"
-            />
+            <DatePicker value={from} onChange={setFrom} bare className="mt-1" />
           </div>
           <div className="rounded-2xl bg-surface px-4 py-3 shadow-sm shadow-black/[0.03]">
             <label className="text-[11px] text-muted">To</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="mt-1 w-full bg-transparent text-sm font-medium outline-none"
-            />
+            <DatePicker value={to} onChange={setTo} bare className="mt-1" />
           </div>
         </div>
       </div>

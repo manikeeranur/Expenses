@@ -9,7 +9,7 @@ export default function LendingActionsMenu({ editSlot, reminderSlot, isClosed, s
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

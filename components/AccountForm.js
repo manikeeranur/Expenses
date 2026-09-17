@@ -4,6 +4,9 @@ import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import AmountInput from "@/components/ui/AmountInput";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 const TYPES = ["Savings Account", "Salary Account", "Cash", "Credit Card"];
 const COLORS = ["#6C5CE7", "#3AA0FF", "#21C37E", "#F5A623", "#F2555A"];
@@ -33,69 +36,70 @@ export default function AccountForm({ action }) {
 
       {open ? (
         <Modal title="Add Account" onClose={() => setOpen(false)}>
-          <form action={formAction} className="space-y-3">
-            <input
-              name="name"
-              type="text"
-              placeholder="Account name (e.g. My HDFC Savings)"
-              required
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-primary"
-            />
-            <select
-              name="type"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-            >
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+          <form action={formAction} className="space-y-4">
+            <div>
+              <Label>Account Name</Label>
+              <Input name="name" type="text" placeholder="e.g. My HDFC Savings" required />
+            </div>
+
+            <div>
+              <Label>Account Type</Label>
+              <Select name="type" value={type} onValueChange={setType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {isBank ? (
               <>
-                <input
-                  name="bankName"
-                  type="text"
-                  placeholder="Bank name (e.g. HDFC Bank)"
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-primary"
-                />
+                <div>
+                  <Label>Bank Name</Label>
+                  <Input name="bankName" type="text" placeholder="e.g. HDFC Bank" />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <input
-                    name="accountNumber"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="Account number"
-                    className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-primary"
-                  />
-                  <input
-                    name="ifsc"
-                    type="text"
-                    placeholder="IFSC code"
-                    className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm uppercase outline-none placeholder:text-muted focus:border-primary"
-                  />
+                  <div>
+                    <Label>Account Number</Label>
+                    <Input name="accountNumber" type="text" inputMode="numeric" placeholder="Account number" />
+                  </div>
+                  <div>
+                    <Label>IFSC Code</Label>
+                    <Input name="ifsc" type="text" placeholder="IFSC code" className="uppercase" />
+                  </div>
                 </div>
               </>
             ) : null}
 
-            <AmountInput
-              name="balance"
-              placeholder="Current balance"
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-primary"
-            />
-            <div className="flex gap-2">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className="h-8 w-8 rounded-full border-2"
-                  style={{ backgroundColor: c, borderColor: color === c ? "var(--color-foreground)" : "transparent" }}
-                  aria-label={c}
-                />
-              ))}
+            <div>
+              <Label>Current Balance</Label>
+              <AmountInput
+                name="balance"
+                placeholder="Current balance"
+                className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <Label>Color</Label>
+              <div className="flex gap-2">
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className="h-8 w-8 rounded-full border-2"
+                    style={{ backgroundColor: c, borderColor: color === c ? "var(--color-foreground)" : "transparent" }}
+                    aria-label={c}
+                  />
+                ))}
+              </div>
             </div>
             <input type="hidden" name="color" value={color} />
             {state?.error ? <p className="text-xs font-medium text-danger">{state.error}</p> : null}

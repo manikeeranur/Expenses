@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { X, ArrowDownToLine, Landmark } from "lucide-react";
 import { requestInstantSettlement } from "@/lib/actions/payments";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDateShort } from "@/lib/format";
 
 const STATUS_TONE = {
   processed: "text-success",
@@ -65,7 +65,7 @@ export default function SettleFlow({ settlements }) {
               <div key={s.id} className="flex items-center justify-between rounded-2xl bg-surface p-3.5 shadow-sm shadow-black/[0.03]">
                 <div>
                   <p className="text-sm font-semibold">{formatCurrency(s.amount / 100)}</p>
-                  <p className="text-xs text-muted">{formatDate(s.created_at * 1000, { day: "numeric", month: "short", year: "numeric" })}</p>
+                  <p className="text-xs text-muted">{formatDateShort(s.created_at * 1000)}</p>
                 </div>
                 <span className={`text-xs font-medium capitalize ${STATUS_TONE[s.status] || "text-muted"}`}>{s.status}</span>
               </div>

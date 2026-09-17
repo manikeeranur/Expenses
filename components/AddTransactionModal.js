@@ -21,7 +21,7 @@ export default function AddTransactionModal({ children }) {
       {children(handleOpen)}
 
       {open ? (
-        <Modal title="Add Transaction" onClose={() => setOpen(false)} wide>
+        <Modal title="Add Transaction" onClose={() => setOpen(false)}>
           {options ? (
             <TransactionForm
               action={createTransaction}

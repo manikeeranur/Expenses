@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, ArrowDownLeft, QrCode, Wallet, ScanLine, ArrowDownToLine } from "lucide-react";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
-import { formatCurrency, formatDate, userUpiId } from "@/lib/format";
+import { formatCurrency, formatDateShort, userUpiId } from "@/lib/format";
 import { requireUserId } from "@/lib/session";
 import { getUser, getUpiTransactions } from "@/lib/data";
 
@@ -107,7 +107,7 @@ export default async function PayPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{t.title}</p>
                       <p className="truncate text-xs text-muted">
-                        {formatDate(t.date, { day: "numeric", month: "short" })} · Ref {t.reference}
+                        {formatDateShort(t.date)} · Ref {t.reference}
                       </p>
                     </div>
                     <p className={`shrink-0 text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}>

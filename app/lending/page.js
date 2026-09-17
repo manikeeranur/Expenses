@@ -1,13 +1,16 @@
-import Link from "next/link";
-import { Plus, HandCoins, PiggyBank, Coins, BarChart3, ChevronRight } from "lucide-react";
+import { HandCoins, PiggyBank, Coins, BarChart3 } from "lucide-react";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
 import Tag from "@/components/ui/Tag";
 import ClickableRow from "@/components/ui/ClickableRow";
 import LendingBarChart from "@/components/charts/LendingBarChart";
+import LendingActionsMenu from "@/components/LendingActionsMenu";
+import LendingForm from "@/components/LendingForm";
+import SendReminderButton from "@/components/SendReminderButton";
 import { formatCurrencyPrecise, formatDateShort, daysSince, ordinal } from "@/lib/format";
 import { requireUserId } from "@/lib/session";
 import { getLendings } from "@/lib/data";
+import { setLendingStatus, deleteLending, sendReminder, updateLending, createLending } from "@/lib/actions/lending";
 
 function summarize(lending) {
   const interest = lending.payments.filter((p) => p.type === "interest").reduce((s, p) => s + p.amount, 0);
@@ -48,6 +51,8 @@ export default async function LendingPage() {
 
   const chartData = summaries.map((l) => ({
     borrower: l.borrower,
+    principal: l.principal,
+    principalRepaid: l.principalRepaid,
     outstanding: l.outstanding,
     interest: l.interest,
   }));
@@ -56,13 +61,7 @@ export default async function LendingPage() {
     <Screen wide>
       <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Lending</h1>
-        <Link
-          href="/lending/new"
-          aria-label="Add lending entry"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/25"
-        >
-          <Plus size={18} />
-        </Link>
+        <LendingForm action={createLending} mode="create" variant="fab" />
       </header>
 
       {summaries.length ? (
@@ -106,7 +105,8 @@ export default async function LendingPage() {
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-light text-primary">
                 <HandCoins size={17} />
               </span>
-              <h2 className="text-sm font-bold">Borrowers</h2>
+              <h2 className="flex-1 text-sm font-bold">Borrowers</h2>
+              <LendingForm action={createLending} mode="create" variant="header" className="hidden md:flex" />
             </div>
 
             <div className="mt-3 overflow-x-auto">
@@ -139,10 +139,10 @@ export default async function LendingPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 text-sm font-semibold text-success">{formatCurrencyPrecise(l.principal)}</td>
-                      <td className="py-3 text-sm text-muted">{formatCurrencyPrecise(l.principalRepaid)}</td>
+                      <td className="py-3 text-sm font-semibold text-danger">{formatCurrencyPrecise(l.principal)}</td>
+                      <td className="py-3 text-sm font-semibold text-success">{formatCurrencyPrecise(l.principalRepaid)}</td>
                       <td className="py-3 text-sm font-semibold text-warning">{formatCurrencyPrecise(l.outstanding)}</td>
-                      <td className="py-3 text-sm font-semibold text-success">{formatCurrencyPrecise(l.interest)}</td>
+                      <td className="py-3 text-sm font-semibold text-info">{formatCurrencyPrecise(l.interest)}</td>
                       <td className="py-3 text-sm text-muted">
                         {l.status === "closed" ? (
                           "—"
@@ -162,9 +162,15 @@ export default async function LendingPage() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center text-muted">
-                            <ChevronRight size={16} />
-                          </span>
+                          <LendingActionsMenu
+                            isClosed={l.status === "closed"}
+                            statusAction={setLendingStatus.bind(null, l._id.toString(), l.status === "closed" ? "active" : "closed")}
+                            deleteAction={deleteLending.bind(null, l._id.toString())}
+                            editSlot={<LendingForm action={updateLending.bind(null, l._id.toString())} defaults={l} variant="menu" />}
+                            reminderSlot={
+                              <SendReminderButton action={sendReminder.bind(null, l._id.toString())} variant="menu" />
+                            }
+                          />
                         </div>
                       </td>
                     </ClickableRow>
@@ -181,13 +187,7 @@ export default async function LendingPage() {
           </div>
           <h2 className="mt-6 text-lg font-bold">No Lending Entries Yet</h2>
           <p className="mt-1 text-sm text-muted">Track money you&apos;ve lent out and the interest collected on it.</p>
-          <Link
-            href="/lending/new"
-            className="mt-6 flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25"
-          >
-            <Plus size={16} />
-            Add Entry
-          </Link>
+          <LendingForm action={createLending} mode="create" variant="empty" />
         </div>
       )}
 

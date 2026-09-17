@@ -6,7 +6,7 @@ import ScreenHeader from "@/components/ScreenHeader";
 import CategoryIcon from "@/components/ui/CategoryIcon";
 import Tag from "@/components/ui/Tag";
 import DeleteButton from "@/components/ui/DeleteButton";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDateShort } from "@/lib/format";
 import { requireUserId } from "@/lib/session";
 import { getTransactionById } from "@/lib/data";
 import { deleteTransaction } from "@/lib/actions/transactions";
@@ -32,7 +32,7 @@ export default async function TransactionDetailsPage({ params }) {
             {isIncome ? "+" : "-"}
             {formatCurrency(transaction.amount)}
           </p>
-          <p className="mt-1 text-xs text-muted">{formatDate(transaction.date)}</p>
+          <p className="mt-1 text-xs text-muted">{formatDateShort(transaction.date)}</p>
         </div>
 
         <div className="mt-4 divide-y divide-border rounded-2xl bg-surface shadow-sm shadow-black/[0.03]">

@@ -5,7 +5,7 @@ import CircularProgress from "@/components/ui/CircularProgress";
 import ContributionForm from "@/components/ContributionForm";
 import DeleteButton from "@/components/ui/DeleteButton";
 import { getIcon } from "@/lib/icons";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDateShort } from "@/lib/format";
 import { requireUserId } from "@/lib/session";
 import { getGoalById } from "@/lib/data";
 import { addContribution, deleteGoal } from "@/lib/actions/goals";
@@ -19,7 +19,7 @@ export default async function GoalDetailsPage({ params }) {
   const Icon = getIcon(goal.icon);
   const pct = Math.min(100, Math.round((goal.saved / goal.target) * 100));
   const remaining = Math.max(0, goal.target - goal.saved);
-  const targetDate = formatDate(goal.dueDate);
+  const targetDate = formatDateShort(goal.dueDate);
   const contributeAction = addContribution.bind(null, id);
   const deleteWithId = deleteGoal.bind(null, id);
 
@@ -63,7 +63,7 @@ export default async function GoalDetailsPage({ params }) {
             {goal.contributions.length ? (
               goal.contributions.slice(0, 10).map((c, i) => (
                 <div key={i} className="flex items-center justify-between rounded-2xl bg-surface p-3.5 shadow-sm shadow-black/[0.03]">
-                  <span className="text-sm text-muted">{formatDate(c.date)}</span>
+                  <span className="text-sm text-muted">{formatDateShort(c.date)}</span>
                   <span className="text-sm font-semibold text-success">+{formatCurrency(c.amount)}</span>
                 </div>
               ))

@@ -24,6 +24,7 @@ export default async function EditTransactionPage({ params }) {
         categories={categories}
         accounts={accounts}
         cancelHref={`/transactions/${id}`}
+        successHref={`/transactions/${id}`}
         submitLabel="Save Changes"
         defaults={{
           type: transaction.type,

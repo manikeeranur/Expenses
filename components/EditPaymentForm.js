@@ -4,6 +4,10 @@ import { useActionState, useState } from "react";
 import { Pencil } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import AmountInput from "@/components/ui/AmountInput";
+import DatePicker from "@/components/ui/DatePicker";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function EditPaymentForm({ action, defaults }) {
   const [open, setOpen] = useState(false);
@@ -47,47 +51,36 @@ export default function EditPaymentForm({ action, defaults }) {
             <input type="hidden" name="type" value={type} />
 
             <div>
-              <label className="text-xs font-medium text-muted">Paid Date</label>
-              <input
-                name="date"
-                type="date"
-                defaultValue={defaults.date ? defaults.date.slice(0, 10) : ""}
-                required
-                className="mt-1.5 w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-              />
+              <Label>Paid Date</Label>
+              <DatePicker name="date" defaultValue={defaults.date ? defaults.date.slice(0, 10) : ""} required />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted">Amount</label>
+              <Label>Amount</Label>
               <AmountInput
                 name="amount"
                 defaultValue={defaults.amount}
                 required
-                className="mt-1.5 w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+                className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted">Payment Method</label>
-              <select
-                name="method"
-                defaultValue={defaults.method || "cash"}
-                className="mt-1.5 w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-              >
-                <option value="cash">Cash</option>
-                <option value="upi">UPI</option>
-              </select>
+              <Label>Payment Method</Label>
+              <Select name="method" defaultValue={defaults.method || "cash"}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted">Remarks</label>
-              <input
-                name="remarks"
-                type="text"
-                defaultValue={defaults.remarks || ""}
-                placeholder="Optional"
-                className="mt-1.5 w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-primary"
-              />
+              <Label>Remarks</Label>
+              <Input name="remarks" type="text" defaultValue={defaults.remarks || ""} placeholder="Optional" />
             </div>
 
             {state?.error ? <p className="text-xs font-medium text-danger">{state.error}</p> : null}

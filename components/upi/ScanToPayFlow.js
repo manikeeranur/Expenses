@@ -4,7 +4,7 @@ import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
 import { X, RefreshCw, Check } from "lucide-react";
 import { createQrCode, fetchQrPayments, closeQrCode } from "@/lib/actions/payments";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDateShort } from "@/lib/format";
 
 export default function ScanToPayFlow({ activeQr, payments }) {
   const [createState, createAction, creating] = useActionState(createQrCode, undefined);
@@ -97,7 +97,7 @@ export default function ScanToPayFlow({ activeQr, payments }) {
                       <Check size={16} className="text-success" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs text-muted">{formatDate(p.createdAt, { day: "numeric", month: "short", year: "numeric" })}</p>
+                      <p className="text-xs text-muted">{formatDateShort(p.createdAt)}</p>
                     </div>
                     <p className="text-sm font-semibold text-success">+{formatCurrency(p.amount)}</p>
                   </div>

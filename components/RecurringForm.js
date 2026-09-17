@@ -3,6 +3,11 @@
 import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import DatePicker from "@/components/ui/DatePicker";
+import CategorySelect from "@/components/ui/CategorySelect";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 const FREQUENCIES = ["Weekly", "Monthly", "Yearly"];
 
@@ -27,50 +32,43 @@ export default function RecurringForm({ action, categories }) {
 
       {open ? (
         <Modal title="Add Recurring Payment" onClose={() => setOpen(false)}>
-          <form action={formAction} className="space-y-3">
-            <input
-              name="name"
-              type="text"
-              placeholder="Name (e.g. Netflix)"
-              required
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-primary"
-            />
-            <select
-              name="categoryId"
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-            >
-              {categories.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <input
-              name="amount"
-              type="number"
-              min="1"
-              step="0.01"
-              placeholder="Amount"
-              required
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-primary"
-            />
-            <select
-              name="frequency"
-              defaultValue="Monthly"
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-            >
-              {FREQUENCIES.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-            <input
-              name="nextDate"
-              type="date"
-              required
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-            />
+          <form action={formAction} className="space-y-4">
+            <div>
+              <Label>Name</Label>
+              <Input name="name" type="text" placeholder="Name (e.g. Netflix)" required />
+            </div>
+
+            <div>
+              <Label>Category</Label>
+              <CategorySelect categories={categories} />
+            </div>
+
+            <div>
+              <Label>Amount</Label>
+              <Input name="amount" type="number" min="1" step="0.01" placeholder="Amount" required />
+            </div>
+
+            <div>
+              <Label>Frequency</Label>
+              <Select name="frequency" defaultValue="Monthly">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select frequency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FREQUENCIES.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {f}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Next Date</Label>
+              <DatePicker name="nextDate" required />
+            </div>
+
             {state?.error ? <p className="text-xs font-medium text-danger">{state.error}</p> : null}
             <button
               type="submit"

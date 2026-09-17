@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { Inbox, Plus, TrendingUp, TrendingDown, Wallet, BarChart3, Pencil } from "lucide-react";
+import { Inbox, Plus, TrendingUp, TrendingDown, Wallet, BarChart3 } from "lucide-react";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
 import CategoryIcon from "@/components/ui/CategoryIcon";
-import DeleteButton from "@/components/ui/DeleteButton";
+import TransactionActionsMenu from "@/components/TransactionActionsMenu";
+import EditTransactionModal from "@/components/EditTransactionModal";
 import IncomeExpenseChart from "@/components/charts/IncomeExpenseChart";
 import { requireUserId } from "@/lib/session";
 import { getTransactions, getMonthlyIncomeExpense } from "@/lib/data";
-import { formatCurrency, formatDateShort } from "@/lib/format";
+import { formatCurrency, formatCurrencyPrecise, formatDateShort } from "@/lib/format";
 import { deleteTransaction } from "@/lib/actions/transactions";
 
 function StatCard({ icon, tone, label, value, valueClassName = "" }) {
@@ -47,14 +48,20 @@ function TransactionTable({ title, totalLabel, totalTone, transactions, emptyLab
         <span className="flex items-center gap-2 rounded-full bg-background px-3 py-1.5">
           <span className="text-[11px] text-muted">{totalLabel}</span>
           <span className={`text-xs font-bold ${totalTone === "success" ? "text-success" : "text-danger"}`}>
-            {formatCurrency(total)}
+            {formatCurrencyPrecise(total)}
           </span>
         </span>
       </div>
 
       {transactions.length ? (
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[420px] border-collapse text-left">
+          <table className="w-full min-w-[420px] table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-[50%]" />
+              <col className="w-[26%]" />
+              <col className="w-[15%]" />
+              <col className="w-[9%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-border">
                 <th className="pb-2 text-[11px] font-medium text-muted">Date</th>
@@ -69,42 +76,33 @@ function TransactionTable({ title, totalLabel, totalTone, transactions, emptyLab
                 const category = t.categoryId;
                 return (
                   <tr key={t._id}>
-                    <td className="py-3 text-sm text-muted">
+                    <td className="truncate py-3 text-sm text-muted">
                       {formatDateShort(t.date)}
-                      <span className="block text-[11px] text-muted">{t.title}</span>
+                      <span className="block truncate text-[11px] text-muted">{t.title}</span>
                     </td>
                     <td className="py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <CategoryIcon
                           icon={isIncome ? "Landmark" : category?.icon}
                           color={isIncome ? "#21C37E" : category?.color || "#9AA0B4"}
                           size="sm"
                         />
-                        <span className="text-xs text-muted">
+                        <span className="truncate text-xs text-muted">
                           {isIncome ? "Income" : category?.name || "Uncategorized"}
                         </span>
                       </div>
                     </td>
                     <td
-                      className={`py-3 text-right text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}
+                      className={`truncate py-3 text-right text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}
                     >
                       {isIncome ? "+" : "-"}
-                      {formatCurrency(t.amount)}
+                      {formatCurrencyPrecise(t.amount)}
                     </td>
                     <td className="py-3">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Link
-                          href={`/transactions/${t._id}/edit`}
-                          aria-label="Edit transaction"
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-primary-light hover:text-primary"
-                        >
-                          <Pencil size={14} />
-                        </Link>
-                        <DeleteButton
-                          action={deleteTransaction.bind(null, t._id)}
-                          variant="outline"
-                          label="Delete transaction"
-                          confirmText="Delete this transaction?"
+                      <div className="flex items-center justify-end">
+                        <TransactionActionsMenu
+                          editSlot={<EditTransactionModal transaction={t} />}
+                          deleteAction={deleteTransaction.bind(null, t._id)}
                         />
                       </div>
                     </td>
