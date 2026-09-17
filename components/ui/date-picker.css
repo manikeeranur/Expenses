@@ -18,6 +18,13 @@
   border-color: var(--color-primary);
 }
 
+/* Portaled to <body> (see portalContainer in DatePicker.js) so it can escape
+   a modal's overflow-y-auto and clipped stacking context; z-index must clear
+   the modal overlay (z-50) and its sticky header (z-10). */
+.react-date-picker__calendar {
+  z-index: 999 !important;
+}
+
 .app-date-picker--bare .react-date-picker__wrapper {
   border: none;
   background: transparent;

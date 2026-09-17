@@ -1,29 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { MoreVertical, Check, Trash2 } from "lucide-react";
+import { useMounted } from "@/lib/useMounted";
 
 // The panel stays mounted (just hidden) so that modals opened from a menu item
-// survive the menu closing — they're rendered by these children.
+// survive the menu closing — they're rendered by these children. It's portaled
+// to <body> and positioned with fixed coords so it never gets clipped by an
+// ancestor's overflow (e.g. the table's horizontal-scroll wrapper).
 export default function LendingActionsMenu({ editSlot, reminderSlot, isClosed, statusAction, deleteAction }) {
   const [open, setOpen] = useState(false);
+  const mounted = useMounted();
+  const [coords, setCoords] = useState(null);
+  const buttonRef = useRef(null);
 
-  return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="More actions"
-        aria-expanded={open}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-surface shadow-sm shadow-black/5"
-      >
-        <MoreVertical size={18} />
-      </button>
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
 
-      {open ? <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} /> : null}
+  function handleToggle() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const panelHeight = 230;
+      const openUpward = window.innerHeight - rect.bottom < panelHeight + 16;
+      setCoords({
+        top: openUpward ? Math.max(8, rect.top - panelHeight - 4) : rect.bottom + 4,
+        left: Math.max(8, rect.right - 256),
+      });
+    }
+    setOpen((v) => !v);
+  }
 
+  const panel = (
+    <>
+      <div className={`fixed inset-0 z-40 ${open ? "" : "hidden"}`} onClick={() => setOpen(false)} />
       <div
-        className={`absolute right-0 top-11 z-50 w-64 rounded-2xl border border-border bg-surface p-1.5 shadow-xl shadow-black/10 ${open ? "" : "hidden"}`}
+        style={coords || undefined}
+        className={`fixed z-50 w-64 rounded-2xl border border-border bg-surface p-1.5 shadow-xl shadow-black/10 ${open ? "" : "hidden"}`}
       >
         <div onClick={() => setOpen(false)}>{editSlot}</div>
         {reminderSlot}
@@ -57,6 +78,23 @@ export default function LendingActionsMenu({ editSlot, reminderSlot, isClosed, s
           </button>
         </form>
       </div>
+    </>
+  );
+
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={handleToggle}
+        aria-label="More actions"
+        aria-expanded={open}
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-surface shadow-sm shadow-black/5"
+      >
+        <MoreVertical size={18} />
+      </button>
+
+      {mounted ? createPortal(panel, document.body) : null}
     </div>
   );
 }

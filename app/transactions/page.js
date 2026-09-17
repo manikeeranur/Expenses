@@ -5,6 +5,7 @@ import BottomNav from "@/components/BottomNav";
 import CategoryIcon from "@/components/ui/CategoryIcon";
 import TransactionActionsMenu from "@/components/TransactionActionsMenu";
 import EditTransactionModal from "@/components/EditTransactionModal";
+import DownloadTransactionsPdf from "@/components/DownloadTransactionsPdf";
 import IncomeExpenseChart from "@/components/charts/IncomeExpenseChart";
 import { requireUserId } from "@/lib/session";
 import { getTransactions, getMonthlyIncomeExpense } from "@/lib/data";
@@ -31,7 +32,7 @@ function StatCard({ icon, tone, label, value, valueClassName = "" }) {
   );
 }
 
-function TransactionTable({ title, totalLabel, totalTone, transactions, emptyLabel }) {
+function TransactionTable({ title, totalLabel, totalTone, transactions, emptyLabel, type }) {
   const total = transactions.reduce((s, t) => s + t.amount, 0);
 
   return (
@@ -115,6 +116,8 @@ function TransactionTable({ title, totalLabel, totalTone, transactions, emptyLab
       ) : (
         <p className="mt-3 rounded-xl bg-background p-4 text-center text-xs text-muted">{emptyLabel}</p>
       )}
+
+      <DownloadTransactionsPdf type={type} />
     </div>
   );
 }
@@ -189,6 +192,7 @@ export default async function TransactionsPage() {
             totalTone="success"
             transactions={income}
             emptyLabel="No income transactions yet."
+            type="income"
           />
 
           <TransactionTable
@@ -197,6 +201,7 @@ export default async function TransactionsPage() {
             totalTone="danger"
             transactions={expenses}
             emptyLabel="No expense transactions yet."
+            type="expense"
           />
         </div>
       ) : (

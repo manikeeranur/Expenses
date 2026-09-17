@@ -11,7 +11,6 @@ import { markNotificationRead } from "@/lib/actions/notifications";
 const typeIcon = {
   alert: "AlertTriangle",
   bill: "Receipt",
-  recurring: "Repeat",
   report: "FileText",
   large: "TrendingUp",
 };
@@ -19,7 +18,6 @@ const typeIcon = {
 const typeTone = {
   alert: "bg-danger-light text-danger",
   bill: "bg-warning-light text-warning",
-  recurring: "bg-info-light text-info",
   report: "bg-primary-light text-primary",
   large: "bg-success-light text-success",
 };

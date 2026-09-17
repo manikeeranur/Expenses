@@ -1,16 +1,13 @@
 import { HandCoins, PiggyBank, Coins, BarChart3 } from "lucide-react";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
-import Tag from "@/components/ui/Tag";
-import ClickableRow from "@/components/ui/ClickableRow";
 import LendingBarChart from "@/components/charts/LendingBarChart";
-import LendingActionsMenu from "@/components/LendingActionsMenu";
+import LendingBorrowersTable from "@/components/LendingBorrowersTable";
 import LendingForm from "@/components/LendingForm";
-import SendReminderButton from "@/components/SendReminderButton";
-import { formatCurrencyPrecise, formatDateShort, daysSince, ordinal } from "@/lib/format";
+import { formatCurrencyPrecise } from "@/lib/format";
 import { requireUserId } from "@/lib/session";
 import { getLendings } from "@/lib/data";
-import { setLendingStatus, deleteLending, sendReminder, updateLending, createLending } from "@/lib/actions/lending";
+import { createLending } from "@/lib/actions/lending";
 
 function summarize(lending) {
   const interest = lending.payments.filter((p) => p.type === "interest").reduce((s, p) => s + p.amount, 0);
@@ -110,73 +107,7 @@ export default async function LendingPage() {
             </div>
 
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="pb-2 text-[11px] font-medium text-muted">Borrower</th>
-                    <th className="pb-2 text-[11px] font-medium text-muted">Principal</th>
-                    <th className="pb-2 text-[11px] font-medium text-muted">Principal Paid</th>
-                    <th className="pb-2 text-[11px] font-medium text-muted">Outstanding</th>
-                    <th className="pb-2 text-[11px] font-medium text-muted">Interest Collected</th>
-                    <th className="pb-2 text-[11px] font-medium text-muted">Monthly Due</th>
-                    <th className="pb-2 text-[11px] font-medium text-muted">Status</th>
-                    <th className="pb-2 text-right text-[11px] font-medium text-muted">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {summaries.map((l) => (
-                    <ClickableRow key={l._id} href={`/lending/${l._id}`}>
-                      <td className="py-3">
-                        <div className="flex items-center gap-2.5">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-light text-xs font-bold text-primary">
-                            {l.borrower.charAt(0).toUpperCase()}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{l.borrower}</p>
-                            <p className="truncate text-[11px] text-muted">
-                              Given {formatDateShort(l.dateGiven)} · {daysSince(l.dateGiven)}d ago
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 text-sm font-semibold text-danger">{formatCurrencyPrecise(l.principal)}</td>
-                      <td className="py-3 text-sm font-semibold text-success">{formatCurrencyPrecise(l.principalRepaid)}</td>
-                      <td className="py-3 text-sm font-semibold text-warning">{formatCurrencyPrecise(l.outstanding)}</td>
-                      <td className="py-3 text-sm font-semibold text-info">{formatCurrencyPrecise(l.interest)}</td>
-                      <td className="py-3 text-sm text-muted">
-                        {l.status === "closed" ? (
-                          "—"
-                        ) : (
-                          <>
-                            {formatCurrencyPrecise(l.monthlyInterest)}
-                            {l.interestDueDay ? (
-                              <span className="block text-[11px] text-muted">{ordinal(l.interestDueDay)} of month</span>
-                            ) : null}
-                          </>
-                        )}
-                      </td>
-                      <td className="py-3">
-                        <Tag tone={l.status === "closed" ? "neutral" : "success"}>
-                          {l.status === "closed" ? "Closed" : "Active"}
-                        </Tag>
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center justify-end">
-                          <LendingActionsMenu
-                            isClosed={l.status === "closed"}
-                            statusAction={setLendingStatus.bind(null, l._id.toString(), l.status === "closed" ? "active" : "closed")}
-                            deleteAction={deleteLending.bind(null, l._id.toString())}
-                            editSlot={<LendingForm action={updateLending.bind(null, l._id.toString())} defaults={l} variant="menu" />}
-                            reminderSlot={
-                              <SendReminderButton action={sendReminder.bind(null, l._id.toString())} variant="menu" />
-                            }
-                          />
-                        </div>
-                      </td>
-                    </ClickableRow>
-                  ))}
-                </tbody>
-              </table>
+              <LendingBorrowersTable summaries={summaries} />
             </div>
           </div>
         </div>

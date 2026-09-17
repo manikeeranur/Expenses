@@ -31,6 +31,7 @@ const LendingSchema = new mongoose.Schema(
     interestDueDay: { type: Number, min: 1, max: 31 },
     note: { type: String, trim: true },
     status: { type: String, enum: ["active", "closed"], default: "active" },
+    order: { type: Number, default: 0 },
     payments: { type: [PaymentSchema], default: [] },
     reminders: { type: [ReminderSchema], default: [] },
   },
