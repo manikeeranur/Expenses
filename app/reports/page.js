@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
 import CategoryDonut from "@/components/charts/CategoryDonut";
+import DownloadTransactionsPdf from "@/components/DownloadTransactionsPdf";
 import { formatCurrency } from "@/lib/format";
 import { requireUserId } from "@/lib/session";
 import { getDashboardSummary } from "@/lib/data";
@@ -24,14 +25,14 @@ export default async function ReportsPage() {
       <div className="px-4 pt-3">
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
-            <p className="text-xs text-muted">Total Expenses</p>
+            <p className="text-xs text-muted">Total Debit</p>
             <p className="mt-1 text-lg font-bold">{formatCurrency(totalExpenses)}</p>
             <p className={`mt-1 text-[11px] font-medium ${expensesChangePct >= 0 ? "text-danger" : "text-success"}`}>
               {expensesChangePct >= 0 ? "↑" : "↓"} {Math.abs(expensesChangePct)}% vs last month
             </p>
           </div>
           <div className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
-            <p className="text-xs text-muted">Total Income</p>
+            <p className="text-xs text-muted">Total Credit</p>
             <p className="mt-1 text-lg font-bold">{formatCurrency(totalIncome)}</p>
             <p className={`mt-1 text-[11px] font-medium ${incomeChangePct >= 0 ? "text-success" : "text-danger"}`}>
               {incomeChangePct >= 0 ? "↑" : "↓"} {Math.abs(incomeChangePct)}% vs last month
@@ -79,6 +80,8 @@ export default async function ReportsPage() {
         >
           View Full Report
         </Link>
+
+        <DownloadTransactionsPdf />
       </div>
 
       <BottomNav />

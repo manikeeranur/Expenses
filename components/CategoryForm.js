@@ -26,6 +26,15 @@ export default function CategoryForm({ mode = "create", action, defaults }) {
         >
           <Plus size={18} />
         </button>
+      ) : mode === "menu" ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium hover:bg-background"
+        >
+          <Pencil size={15} className="text-muted" />
+          Edit Category
+        </button>
       ) : (
         <button
           type="button"

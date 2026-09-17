@@ -7,6 +7,7 @@ const CategorySchema = new mongoose.Schema(
     icon: { type: String, default: "MoreHorizontal" },
     color: { type: String, default: "#6C5CE7" },
     budget: { type: Number, default: 0 },
+    order: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

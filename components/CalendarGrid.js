@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { CalendarDays, Pencil } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import CategoryIcon from "@/components/ui/CategoryIcon";
-import DeleteButton from "@/components/ui/DeleteButton";
+import TransactionActionsMenu from "@/components/TransactionActionsMenu";
+import EditTransactionModal from "@/components/EditTransactionModal";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { deleteTransaction } from "@/lib/actions/transactions";
 
@@ -90,13 +90,13 @@ export default function CalendarGrid({ year, month, eventsByDate, todayKey }) {
                         <td className="py-3">
                           <div className="flex items-center gap-2.5">
                             <CategoryIcon
-                              icon={isIncome ? "Landmark" : e.category?.icon}
-                              color={isIncome ? "#21C37E" : e.category?.color || "#9AA0B4"}
+                              icon={isIncome ? "Landmark" : e.categoryId?.icon}
+                              color={isIncome ? "#21C37E" : e.categoryId?.color || "#9AA0B4"}
                               size="sm"
                             />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-semibold">{e.title}</p>
-                              <p className="truncate text-[11px] text-muted">{isIncome ? "Income" : e.category?.name || "Uncategorized"}</p>
+                              <p className="truncate text-[11px] text-muted">{isIncome ? "Income" : e.categoryId?.name || "Uncategorized"}</p>
                             </div>
                           </div>
                         </td>
@@ -105,19 +105,10 @@ export default function CalendarGrid({ year, month, eventsByDate, todayKey }) {
                           {formatCurrency(e.amount)}
                         </td>
                         <td className="py-3">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Link
-                              href={`/transactions/${e._id}/edit`}
-                              aria-label="Edit transaction"
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-primary-light hover:text-primary"
-                            >
-                              <Pencil size={14} />
-                            </Link>
-                            <DeleteButton
-                              action={deleteTransaction.bind(null, e._id)}
-                              variant="outline"
-                              label="Delete transaction"
-                              confirmText="Delete this transaction?"
+                          <div className="flex items-center justify-end">
+                            <TransactionActionsMenu
+                              editSlot={<EditTransactionModal transaction={e} />}
+                              deleteAction={deleteTransaction.bind(null, e._id)}
                             />
                           </div>
                         </td>
