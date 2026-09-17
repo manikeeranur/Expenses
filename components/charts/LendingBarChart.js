@@ -33,16 +33,17 @@ function formatIndianTick(v) {
   return `${v}`;
 }
 
-function ValueLabel({ x, y, width, value, fill }) {
+function ValueLabel({ x, y, width, height, value, fill }) {
   if (!value) return null;
   const text = `₹${formatIndianTick(value)}`;
   const boxWidth = text.length * 5.5 + 10;
-  const cx = x + width / 2;
+  const cy = y + height / 2;
+  const lx = x + width + 4;
 
   return (
     <g>
-      <rect x={cx - boxWidth / 2} y={y - 16} width={boxWidth} height={13} rx={6.5} fill={fill} />
-      <text x={cx} y={y - 7} textAnchor="middle" dominantBaseline="middle" fontSize={9} fontWeight={600} fill="#fff">
+      <rect x={lx} y={cy - 7} width={boxWidth} height={13} rx={6.5} fill={fill} />
+      <text x={lx + boxWidth / 2} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={9} fontWeight={600} fill="#fff">
         {text}
       </text>
     </g>
@@ -52,14 +53,15 @@ function ValueLabel({ x, y, width, value, fill }) {
 export default function LendingBarChart({ data }) {
   const maxValue = Math.max(0, ...data.flatMap((d) => SERIES.map((s) => d[s.key] || 0)));
   const ticks = niceTicks(maxValue);
+  const height = Math.max(220, data.length * 100);
 
   return (
     <div>
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={data} margin={{ top: 4, right: 8, left: -12, bottom: 0 }} barGap={4}>
-          <CartesianGrid vertical={false} stroke="#ecebf5" />
-          <XAxis dataKey="borrower" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#8b8aa3" }} />
-          <YAxis
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 48, left: 8, bottom: 0 }} barGap={4} barCategoryGap="20%">
+          <CartesianGrid horizontal={false} stroke="#ecebf5" />
+          <XAxis
+            type="number"
             tickLine={false}
             axisLine={false}
             tick={{ fontSize: 10, fill: "#8b8aa3" }}
@@ -67,12 +69,20 @@ export default function LendingBarChart({ data }) {
             domain={[0, ticks[ticks.length - 1]]}
             tickFormatter={formatIndianTick}
           />
+          <YAxis
+            type="category"
+            dataKey="borrower"
+            tickLine={false}
+            axisLine={false}
+            width={90}
+            tick={{ fontSize: 11, fill: "#4b4a63" }}
+          />
           <Tooltip
             formatter={(value, name) => [formatCurrencyPrecise(value), name]}
             contentStyle={{ borderRadius: 12, border: "1px solid #ecebf5", fontSize: 12 }}
           />
           {SERIES.map((s) => (
-            <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[4, 4, 4, 4]} maxBarSize={16}>
+            <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[0, 4, 4, 0]} maxBarSize={16}>
               <LabelList dataKey={s.key} content={(props) => <ValueLabel {...props} fill={s.color} />} />
             </Bar>
           ))}
