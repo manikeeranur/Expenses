@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { X, Check, Camera, KeyRound, Copy } from "lucide-react";
+import { X, Check, Camera, KeyRound, Copy, Upload } from "lucide-react";
+import jsQR from "jsqr";
 import QRCode from "qrcode";
 import UpiQrScanner from "@/components/upi/UpiQrScanner";
 import CategorySelect from "@/components/ui/CategorySelect";
@@ -10,15 +11,52 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { initiateUpiPayment, confirmUpiPayment } from "@/lib/actions/upi-pay";
-import { parseUpiUri, isValidUpiId } from "@/lib/upi";
+import { parseUpiUri, isValidUpiId, buildAppUpiUri } from "@/lib/upi";
 import { formatCurrency } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
+
+// GPay, PhonePe, Paytm, BHIM and Amazon Pay each answer to their own custom
+// scheme (all accepting the same pa/pn/am/tn/tr params). Anything else —
+// including apps like INDmoney — still has to register the generic "upi://"
+// scheme to be UPI-compliant, so "Other UPI App" reaches those via whatever
+// chooser the phone's OS shows for that scheme.
+const UPI_APPS = [
+  { key: "gpay", label: "Google Pay", scheme: "tez://upi/pay" },
+  { key: "phonepe", label: "PhonePe", scheme: "phonepe://pay" },
+  { key: "paytm", label: "Paytm", scheme: "paytmmp://pay" },
+  { key: "bhim", label: "BHIM", scheme: "bhim://pay" },
+  { key: "amazonpay", label: "Amazon Pay", scheme: "amazonpay://pay" },
+  { key: "other", label: "Other UPI App", scheme: "upi://pay" },
+];
+
+function decodeQrFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read that file."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Could not read that image."));
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        resolve(code?.data || null);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function PayViaUpiFlow({ categories }) {
   const mounted = useMounted();
   const isMobile = mounted && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-  const [step, setStep] = useState("scan"); // scan, manual, details, confirm, awaiting
+  const [step, setStep] = useState("scan"); // scan, manual, details, confirm
   const [payeeUpi, setPayeeUpi] = useState("");
   const [payeeName, setPayeeName] = useState("");
   const [amount, setAmount] = useState("");
@@ -29,6 +67,8 @@ export default function PayViaUpiFlow({ categories }) {
   const [confirming, startConfirm] = useTransition();
   const [confirmError, setConfirmError] = useState(null);
   const [finalStatus, setFinalStatus] = useState(null);
+  const [chosenApp, setChosenApp] = useState(null);
+  const fileInputRef = useRef(null);
 
   const [initState, initiateAction, initiating] = useActionState(initiateUpiPayment, undefined);
 
@@ -46,16 +86,24 @@ export default function PayViaUpiFlow({ categories }) {
     setStep("details");
   }, []);
 
-  const awaitingConfirmation = Boolean(initState?.success);
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await decodeQrFromFile(file);
+      if (!text) {
+        setScanError("Couldn't find a QR code in that image. Try another photo or enter details manually.");
+        return;
+      }
+      handleScan(text);
+    } catch {
+      setScanError("Couldn't read that image. Try another photo or enter details manually.");
+    }
+  }
 
-  // A successful initiate means the transaction row already exists in the
-  // database with status "initiated". Redirecting to the UPI app never marks
-  // it paid on its own — that only happens once the user answers below.
-  useEffect(() => {
-    if (!initState?.success || !isMobile) return;
-    window.location.href = initState.upiUri;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initState]);
+  const awaitingConfirmation = Boolean(initState?.success);
+  const showAppChooser = awaitingConfirmation && !finalStatus && isMobile && !chosenApp;
 
   useEffect(() => {
     if (!awaitingConfirmation || !initState?.upiUri) return;
@@ -89,13 +137,29 @@ export default function PayViaUpiFlow({ categories }) {
         <div className="mt-6 space-y-4">
           <UpiQrScanner onScan={handleScan} />
           {scanError ? <p className="text-xs font-medium text-danger">{scanError}</p> : null}
-          <button
-            type="button"
-            onClick={() => setStep("manual")}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border py-3 text-sm font-semibold"
-          >
-            <KeyRound size={15} /> Enter UPI ID manually
-          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-border py-3 text-sm font-semibold"
+            >
+              <Upload size={15} /> Upload QR Image
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep("manual")}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-border py-3 text-sm font-semibold"
+            >
+              <KeyRound size={15} /> Enter Manually
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -203,7 +267,37 @@ export default function PayViaUpiFlow({ categories }) {
         </form>
       ) : null}
 
-      {awaitingConfirmation ? (
+      {showAppChooser ? (
+        <div className="mt-6">
+          <div className="rounded-2xl bg-surface p-4 text-center">
+            <p className="text-sm text-muted">Pay</p>
+            <p className="mt-1 text-2xl font-bold">{formatCurrency(initState.amount)}</p>
+            <p className="mt-1 text-sm text-muted">to {initState.payeeName}</p>
+          </div>
+          <p className="mt-5 text-xs font-medium text-muted">Choose an app to pay with</p>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            {UPI_APPS.map((app) => (
+              <button
+                key={app.key}
+                type="button"
+                onClick={() => {
+                  setChosenApp(app.key);
+                  window.location.href = buildAppUpiUri(initState.upiUri, app.scheme);
+                }}
+                className="flex flex-col items-center gap-1.5 rounded-2xl border border-border bg-surface py-3.5"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-light text-sm font-bold text-primary-dark">
+                  {app.label.charAt(0)}
+                </span>
+                <span className="text-center text-[11px] font-medium leading-tight">{app.label}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-4 text-center text-xs text-muted">
+            Don&apos;t see your app? &quot;Other UPI App&quot; opens your phone&apos;s own app picker.
+          </p>
+        </div>
+      ) : awaitingConfirmation ? (
         <div className="mt-10 flex flex-col items-center text-center">
           {finalStatus ? (
             <>
@@ -229,24 +323,24 @@ export default function PayViaUpiFlow({ categories }) {
               <p className="mt-1 text-2xl font-bold">{formatCurrency(initState.amount)}</p>
               <p className="mt-1 text-sm text-muted">to {initState.payeeName}</p>
 
-              {!isMobile ? (
-                <div className="mt-6 flex w-full flex-col items-center gap-3 rounded-2xl border border-border p-4">
-                  <p className="text-xs text-muted">
-                    UPI apps can&apos;t open from a desktop browser. Scan this with your phone to complete the payment.
-                  </p>
-                  {qrDataUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={qrDataUrl} alt="UPI payment QR code" width={200} height={200} className="rounded-xl" />
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard?.writeText(initState.upiUri)}
-                    className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold"
-                  >
-                    <Copy size={13} /> Copy UPI Link
-                  </button>
-                </div>
-              ) : null}
+              <div className="mt-6 flex w-full flex-col items-center gap-3 rounded-2xl border border-border p-4">
+                <p className="text-xs text-muted">
+                  {isMobile
+                    ? "If nothing opened, scan this QR with your UPI app instead, or copy the link."
+                    : "UPI apps can't open from a desktop browser. Scan this with your phone to complete the payment."}
+                </p>
+                {qrDataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={qrDataUrl} alt="UPI payment QR code" width={200} height={200} className="rounded-xl" />
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard?.writeText(initState.upiUri)}
+                  className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold"
+                >
+                  <Copy size={13} /> Copy UPI Link
+                </button>
+              </div>
 
               <p className="mt-8 text-xs font-medium text-muted">Did the payment go through?</p>
               {confirmError ? <p className="mt-2 text-xs font-medium text-danger">{confirmError}</p> : null}
@@ -270,12 +364,8 @@ export default function PayViaUpiFlow({ categories }) {
               </div>
 
               {isMobile ? (
-                <button
-                  type="button"
-                  onClick={() => (window.location.href = initState.upiUri)}
-                  className="mt-4 text-xs font-semibold text-primary"
-                >
-                  Didn&apos;t open? Try again
+                <button type="button" onClick={() => setChosenApp(null)} className="mt-4 text-xs font-semibold text-primary">
+                  Try a different app
                 </button>
               ) : null}
             </>
