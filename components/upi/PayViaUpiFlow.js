@@ -273,6 +273,15 @@ export default function PayViaUpiFlow({ categories }) {
             opening the app alone doesn&apos;t count.
           </p>
 
+          <div className="rounded-2xl bg-warning-light p-3">
+            <p className="text-xs font-medium">If your bank rejects this (&quot;exceeded bank limit&quot;, etc.):</p>
+            <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-muted">
+              <li>Banks apply lower limits to first-time payees for ~24 hours — try again later, or use a payee you&apos;ve paid before.</li>
+              <li>Try a different app from the next screen — GPay, PhonePe and Paytm can each apply different limits for the same payee.</li>
+              <li>This is a bank-side decision, not something this app controls — the payment isn&apos;t lost, it simply never left your account.</li>
+            </ul>
+          </div>
+
           <button
             type="submit"
             disabled={initiating}
@@ -359,6 +368,9 @@ export default function PayViaUpiFlow({ categories }) {
               </div>
 
               <p className="mt-8 text-xs font-medium text-muted">Did the payment go through?</p>
+              <p className="mt-1 text-xs text-muted">
+                If your bank blocked it (limit/new payee), tap No, then try a different app or payee below.
+              </p>
               {confirmError ? <p className="mt-2 text-xs font-medium text-danger">{confirmError}</p> : null}
               <div className="mt-3 flex w-full max-w-xs gap-3">
                 <button
