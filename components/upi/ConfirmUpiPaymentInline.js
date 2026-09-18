@@ -8,11 +8,12 @@ export default function ConfirmUpiPaymentInline({ transactionId }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState(null);
   const [resolved, setResolved] = useState(null);
+  const [note, setNote] = useState("");
 
   function resolve(status) {
     setError(null);
     startTransition(async () => {
-      const res = await confirmUpiPayment(transactionId, status);
+      const res = await confirmUpiPayment(transactionId, status, note);
       if (res?.error) setError(res.error);
       else setResolved(status);
     });
@@ -29,6 +30,13 @@ export default function ConfirmUpiPaymentInline({ transactionId }) {
   return (
     <div className="mt-3 rounded-2xl bg-warning-light p-3">
       <p className="text-xs font-medium">Did this UPI payment go through?</p>
+      <p className="mt-1 text-xs text-muted">This is self-reported — there&apos;s no bank confirmation behind it.</p>
+      <input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="UTR/reference number, or reason if it failed (optional)"
+        className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs outline-none placeholder:text-muted focus:border-primary"
+      />
       {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
       <div className="mt-2 flex gap-2">
         <button

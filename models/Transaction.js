@@ -18,6 +18,11 @@ const TransactionSchema = new mongoose.Schema(
     reference: { type: String, default: null },
     paymentStatus: { type: String, enum: ["initiated", "pending", "paid", "cancelled"], default: null },
     upiUri: { type: String, default: null },
+    // User-supplied, for their own records only — never a verification signal.
+    // A P2P UPI intent flow has no bank callback, so paymentStatus is always
+    // self-reported; these two just let the user annotate that self-report.
+    bankReferenceNumber: { type: String, default: null },
+    failureReason: { type: String, default: null },
     source: { type: String, enum: ["MANUAL", "BANK_SYNC", "CSV_IMPORT"], default: "MANUAL" },
   },
   { timestamps: true }

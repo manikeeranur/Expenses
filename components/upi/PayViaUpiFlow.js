@@ -66,6 +66,7 @@ export default function PayViaUpiFlow({ categories }) {
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [confirming, startConfirm] = useTransition();
   const [confirmError, setConfirmError] = useState(null);
+  const [confirmNote, setConfirmNote] = useState("");
   const [finalStatus, setFinalStatus] = useState(null);
   const [chosenApp, setChosenApp] = useState(null);
   const [scannedUri, setScannedUri] = useState(null);
@@ -125,7 +126,7 @@ export default function PayViaUpiFlow({ categories }) {
   function resolvePayment(status) {
     setConfirmError(null);
     startConfirm(async () => {
-      const res = await confirmUpiPayment(initState.transactionId, status);
+      const res = await confirmUpiPayment(initState.transactionId, status, confirmNote);
       if (res?.error) setConfirmError(res.error);
       else setFinalStatus(status);
     });
@@ -344,33 +345,52 @@ export default function PayViaUpiFlow({ categories }) {
             </>
           ) : (
             <>
-              <p className="text-sm text-muted">{isMobile ? "Opened your UPI app for" : "Ready to pay"}</p>
-              <p className="mt-1 text-2xl font-bold">{formatCurrency(initState.amount)}</p>
+              <p className="text-sm font-medium">
+                {isMobile
+                  ? "Complete the payment in your UPI app. Do not close this page until you return."
+                  : "Ready to pay"}
+              </p>
+              <p className="mt-3 text-2xl font-bold">{formatCurrency(initState.amount)}</p>
               <p className="mt-1 text-sm text-muted">to {initState.payeeName}</p>
 
               <div className="mt-6 flex w-full flex-col items-center gap-3 rounded-2xl border border-border p-4">
                 <p className="text-xs text-muted">
                   {isMobile
-                    ? "If nothing opened, scan this QR with your UPI app instead, or copy the link."
-                    : "UPI apps can't open from a desktop browser. Scan this with your phone to complete the payment."}
+                    ? "If nothing opened, scan this QR with your UPI app instead, or copy the details below."
+                    : "UPI apps can't open from a desktop browser. Scan this QR with your phone to complete the payment."}
                 </p>
                 {qrDataUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={qrDataUrl} alt="UPI payment QR code" width={200} height={200} className="rounded-xl" />
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard?.writeText(initState.upiUri)}
-                  className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold"
-                >
-                  <Copy size={13} /> Copy UPI Link
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard?.writeText(initState.upiUri)}
+                    className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold"
+                  >
+                    <Copy size={13} /> Copy UPI Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard?.writeText(payeeUpi)}
+                    className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold"
+                  >
+                    <Copy size={13} /> Copy UPI ID
+                  </button>
+                </div>
               </div>
 
               <p className="mt-8 text-xs font-medium text-muted">Did the payment go through?</p>
               <p className="mt-1 text-xs text-muted">
-                If your bank blocked it (limit/new payee), tap No, then try a different app or payee below.
+                This app has no way to verify that with the bank — it can only record what you tell it here.
               </p>
+              <input
+                value={confirmNote}
+                onChange={(e) => setConfirmNote(e.target.value)}
+                placeholder="UTR/reference number, or reason if it failed (optional)"
+                className="mt-3 w-full max-w-xs rounded-xl border border-border bg-background px-3 py-2 text-xs outline-none placeholder:text-muted focus:border-primary"
+              />
               {confirmError ? <p className="mt-2 text-xs font-medium text-danger">{confirmError}</p> : null}
               <div className="mt-3 flex w-full max-w-xs gap-3">
                 <button

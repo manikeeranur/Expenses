@@ -65,7 +65,19 @@ export default async function TransactionDetailsPage({ params }) {
               }
             />
           ) : null}
+          {transaction.bankReferenceNumber ? (
+            <Row icon={<Hash size={16} className="text-primary" />} label="UTR / Bank Ref." value={transaction.bankReferenceNumber} />
+          ) : null}
+          {transaction.failureReason ? (
+            <Row icon={<Hash size={16} className="text-primary" />} label="Reason" value={transaction.failureReason} />
+          ) : null}
         </div>
+
+        {transaction.paymentStatus ? (
+          <p className="mt-2 px-1 text-[11px] text-muted">
+            Status is self-reported — UPI person-to-person payments have no bank verification callback this app can check.
+          </p>
+        ) : null}
 
         {["initiated", "pending"].includes(transaction.paymentStatus) ? (
           <ConfirmUpiPaymentInline transactionId={transaction._id} />
