@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Inbox, Plus, TrendingUp, TrendingDown, Wallet, BarChart3, IndianRupee } from "lucide-react";
+import { Inbox, Plus, QrCode, TrendingUp, TrendingDown, Wallet, BarChart3, IndianRupee } from "lucide-react";
 import Screen from "@/components/Screen";
 import BottomNav from "@/components/BottomNav";
 import CategoryIcon from "@/components/ui/CategoryIcon";
+import Tag from "@/components/ui/Tag";
 import TransactionActionsMenu from "@/components/TransactionActionsMenu";
 import EditTransactionModal from "@/components/EditTransactionModal";
 import DownloadTransactionsPdf from "@/components/DownloadTransactionsPdf";
@@ -11,6 +12,13 @@ import { requireUserId } from "@/lib/session";
 import { getTransactions, getMonthlyIncomeExpense } from "@/lib/data";
 import { formatCurrency, formatCurrencyPrecise, formatDateShort } from "@/lib/format";
 import { deleteTransaction } from "@/lib/actions/transactions";
+import { UNSETTLED_UPI_STATUSES } from "@/lib/upi";
+
+const PAYMENT_STATUS_TAG = {
+  initiated: { tone: "warning", label: "Pending" },
+  pending: { tone: "warning", label: "Pending" },
+  cancelled: { tone: "danger", label: "Cancelled" },
+};
 
 function StatCard({ icon, tone, label, value, valueClassName = "" }) {
   const tones = {
@@ -83,6 +91,9 @@ function TransactionTable({ transactions, net }) {
                         <span className="truncate text-xs text-muted">
                           {isIncome ? "Income" : category?.name || "Uncategorized"}
                         </span>
+                        {PAYMENT_STATUS_TAG[t.paymentStatus] ? (
+                          <Tag tone={PAYMENT_STATUS_TAG[t.paymentStatus].tone}>{PAYMENT_STATUS_TAG[t.paymentStatus].label}</Tag>
+                        ) : null}
                       </div>
                     </td>
                     <td
@@ -121,21 +132,31 @@ export default async function TransactionsPage() {
     getMonthlyIncomeExpense(userId, 6),
   ]);
 
-  const totalIncome = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const totalExpenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const isSettled = (t) => !UNSETTLED_UPI_STATUSES.includes(t.paymentStatus);
+  const totalIncome = transactions.filter((t) => t.type === "income" && isSettled(t)).reduce((s, t) => s + t.amount, 0);
+  const totalExpenses = transactions.filter((t) => t.type === "expense" && isSettled(t)).reduce((s, t) => s + t.amount, 0);
   const net = totalIncome - totalExpenses;
 
   return (
     <Screen wide>
       <header className="flex items-center justify-between px-4 pb-2 pt-6 md:hidden">
         <h1 className="text-xl font-bold">Transactions</h1>
-        <Link
-          href="/transactions/add"
-          aria-label="Add transaction"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/25"
-        >
-          <Plus size={18} />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/transactions/pay"
+            aria-label="Pay via UPI"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-surface text-primary shadow-sm shadow-black/5"
+          >
+            <QrCode size={18} />
+          </Link>
+          <Link
+            href="/transactions/add"
+            aria-label="Add transaction"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/25"
+          >
+            <Plus size={18} />
+          </Link>
+        </div>
       </header>
 
       {transactions.length ? (
@@ -191,6 +212,10 @@ export default async function TransactionsPage() {
           >
             <Plus size={16} />
             Add Transaction
+          </Link>
+          <Link href="/transactions/pay" className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-primary">
+            <QrCode size={14} />
+            Pay via UPI
           </Link>
         </div>
       )}

@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { FileImage, Landmark, CreditCard, Tag as TagIcon, QrCode, Hash } from "lucide-react";
+import { FileImage, Landmark, CreditCard, Tag as TagIcon, QrCode, Hash, Clock } from "lucide-react";
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import CategoryIcon from "@/components/ui/CategoryIcon";
 import Tag from "@/components/ui/Tag";
 import DeleteButton from "@/components/ui/DeleteButton";
+import ConfirmUpiPaymentInline from "@/components/upi/ConfirmUpiPaymentInline";
 import { formatCurrency, formatDateShort } from "@/lib/format";
 import { requireUserId } from "@/lib/session";
 import { getTransactionById } from "@/lib/data";
@@ -41,7 +42,34 @@ export default async function TransactionDetailsPage({ params }) {
           <Row icon={<TagIcon size={16} className="text-primary" />} label="Category" value={isIncome ? "Income" : category?.name || "Uncategorized"} />
           {transaction.upiId ? <Row icon={<QrCode size={16} className="text-primary" />} label="UPI ID" value={transaction.upiId} /> : null}
           {transaction.reference ? <Row icon={<Hash size={16} className="text-primary" />} label="Reference No." value={transaction.reference} /> : null}
+          {transaction.paymentStatus ? (
+            <Row
+              icon={<Clock size={16} className="text-primary" />}
+              label="Payment Status"
+              value={
+                <span
+                  className={
+                    transaction.paymentStatus === "paid"
+                      ? "text-success"
+                      : transaction.paymentStatus === "cancelled"
+                      ? "text-danger"
+                      : "text-warning"
+                  }
+                >
+                  {transaction.paymentStatus === "paid"
+                    ? "Paid"
+                    : transaction.paymentStatus === "cancelled"
+                    ? "Cancelled"
+                    : "Pending"}
+                </span>
+              }
+            />
+          ) : null}
         </div>
+
+        {["initiated", "pending"].includes(transaction.paymentStatus) ? (
+          <ConfirmUpiPaymentInline transactionId={transaction._id} />
+        ) : null}
 
         {transaction.description ? (
           <div className="mt-4 rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">

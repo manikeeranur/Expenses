@@ -16,6 +16,8 @@ const TransactionSchema = new mongoose.Schema(
     receiptSize: { type: String, default: null },
     upiId: { type: String, default: null },
     reference: { type: String, default: null },
+    paymentStatus: { type: String, enum: ["initiated", "pending", "paid", "cancelled"], default: null },
+    upiUri: { type: String, default: null },
     source: { type: String, enum: ["MANUAL", "BANK_SYNC", "CSV_IMPORT"], default: "MANUAL" },
   },
   { timestamps: true }
