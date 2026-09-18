@@ -68,6 +68,8 @@ export default function PayViaUpiFlow({ categories }) {
   const [confirmError, setConfirmError] = useState(null);
   const [finalStatus, setFinalStatus] = useState(null);
   const [chosenApp, setChosenApp] = useState(null);
+  const [scannedUri, setScannedUri] = useState(null);
+  const [amountLocked, setAmountLocked] = useState(false);
   const fileInputRef = useRef(null);
 
   const [initState, initiateAction, initiating] = useActionState(initiateUpiPayment, undefined);
@@ -82,9 +84,17 @@ export default function PayViaUpiFlow({ categories }) {
     setPayeeName(parsed.pn || "");
     if (parsed.am) setAmount(String(parsed.am));
     if (parsed.tn) setNote(parsed.tn);
+    setScannedUri(parsed.raw);
+    setAmountLocked(parsed.am != null);
     setScanError("");
     setStep("details");
   }, []);
+
+  function goToManualEntry() {
+    setScannedUri(null);
+    setAmountLocked(false);
+    setStep("manual");
+  }
 
   async function handleFileUpload(e) {
     const file = e.target.files?.[0];
@@ -154,7 +164,7 @@ export default function PayViaUpiFlow({ categories }) {
             </button>
             <button
               type="button"
-              onClick={() => setStep("manual")}
+              onClick={goToManualEntry}
               className="flex items-center justify-center gap-2 rounded-2xl border border-border py-3 text-sm font-semibold"
             >
               <KeyRound size={15} /> Enter Manually
@@ -208,9 +218,11 @@ export default function PayViaUpiFlow({ categories }) {
                 min="1"
                 step="0.01"
                 placeholder="0"
-                className="w-full bg-transparent text-sm outline-none"
+                readOnly={amountLocked}
+                className={`w-full bg-transparent text-sm outline-none ${amountLocked ? "text-muted" : ""}`}
               />
             </div>
+            {amountLocked ? <p className="mt-1.5 text-xs text-muted">Amount is fixed by this QR code.</p> : null}
           </div>
           <div>
             <Label>Category</Label>
@@ -219,6 +231,9 @@ export default function PayViaUpiFlow({ categories }) {
           <div>
             <Label>Note (optional)</Label>
             <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What's it for?" />
+            {scannedUri ? (
+              <p className="mt-1.5 text-xs text-muted">This is just for your own records — it doesn&apos;t change what&apos;s sent to the UPI app.</p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -238,6 +253,7 @@ export default function PayViaUpiFlow({ categories }) {
           <input type="hidden" name="amount" value={amount} />
           <input type="hidden" name="note" value={note} />
           <input type="hidden" name="categoryId" value={categoryId} />
+          <input type="hidden" name="scannedUri" value={scannedUri || ""} />
 
           <div className="rounded-2xl bg-surface p-5 shadow-sm shadow-black/[0.03]">
             <p className="text-center text-xs text-muted">You&apos;re paying</p>
