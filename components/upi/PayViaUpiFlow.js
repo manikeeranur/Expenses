@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { initiateUpiPayment, confirmUpiPayment } from "@/lib/actions/upi-pay";
-import { parseUpiUri, isValidUpiId, validateUpiUri, logUpiDebug } from "@/lib/upi";
+import { parseUpiUri, isValidUpiId, validateUpiUri, logUpiDebug, getAllUpiParams, diffUpiUris, buildUpiUri } from "@/lib/upi";
 import { formatCurrency } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 
@@ -79,6 +79,7 @@ export default function PayViaUpiFlow({ categories }) {
   const [initState, initiateAction, initiating] = useActionState(initiateUpiPayment, undefined);
 
   const handleScan = useCallback((text) => {
+    if (DEV) console.log("ORIGINAL_QR_PAYLOAD", text);
     const parsed = parseUpiUri(text);
     if (!parsed) {
       logUpiDebug("scan:rejected", { originalQrPayload: text });
@@ -95,6 +96,9 @@ export default function PayViaUpiFlow({ categories }) {
       tn: parsed.tn,
       tr: parsed.tr,
       mc: parsed.mc,
+      // Every param the QR actually carries, including ones this app doesn't
+      // otherwise use (mode, purpose, orgid, sign, refUrl, …) — see STEP 2.
+      allParams: getAllUpiParams(parsed.raw),
     });
     setPayeeUpi(parsed.pa);
     setPayeeName(parsed.pn || "");
@@ -192,6 +196,28 @@ export default function PayViaUpiFlow({ categories }) {
     // No e.preventDefault(): the anchor's own href navigation is what opens
     // the UPI app, so the browser handles it as a direct, top-level,
     // user-gesture-driven deep link — no window.location/intent:// needed.
+  }
+
+  // STEP 9 (dev-only debug tool): a minimal, freshly-built upi://pay link for
+  // the SAME payee at a trivial ₹1, built from scratch (ignoring anything the
+  // scanned QR carries beyond pa/pn). Isolates whether the Chrome→Android
+  // app-launch mechanism itself works at all, independent of this QR's
+  // extra parameters.
+  function handleDebugMinimalClick() {
+    const uri = buildUpiUri({ payeeUpiId: payeeUpi, payeeName, amount: 1, reference: "DEBUGTEST1" });
+    console.log("DEBUG_MINIMAL_UPI_URI", uri);
+    logUpiDebug("debug:minimal", { uri });
+  }
+
+  // STEP 10 (dev-only debug tool): the untouched original QR string, launched
+  // directly — no server round trip, no finalizeScannedUpiUri, no
+  // sanitizing, nothing. If THIS also fails in an app that succeeds when
+  // that same app scans the QR natively, the difference is how that app
+  // treats a browser-launched intent, not anything this code is doing to
+  // the payload — see the explanation printed alongside this button.
+  function handleDebugRawClick() {
+    console.log("DEBUG_RAW_QR_URI", scannedUri);
+    logUpiDebug("debug:raw", { uri: scannedUri });
   }
 
   function resolvePayment(status) {
@@ -315,6 +341,39 @@ export default function PayViaUpiFlow({ categories }) {
           >
             Review Payment
           </button>
+
+          {DEV ? (
+            <div className="rounded-2xl border border-dashed border-border p-3">
+              <p className="text-xs font-semibold text-muted">Developer test tools (hidden in production)</p>
+              <p className="mt-1 text-[11px] text-muted">
+                Use these to isolate the launch mechanism from the QR&apos;s own parameters. Both open your phone&apos;s
+                UPI app chooser directly — check your browser/remote-debug console for the exact URI each one sends.
+              </p>
+              <div className="mt-2 flex flex-col gap-2">
+                <a
+                  href={buildUpiUri({ payeeUpiId: payeeUpi, payeeName, amount: 1, reference: "DEBUGTEST1" })}
+                  onClick={handleDebugMinimalClick}
+                  className="rounded-xl border border-border py-2 text-center text-xs font-semibold"
+                >
+                  TEST UPI PAYMENT (₹1, minimal link)
+                </a>
+                {scannedUri ? (
+                  <a
+                    href={scannedUri}
+                    onClick={handleDebugRawClick}
+                    className="rounded-xl border border-border py-2 text-center text-xs font-semibold"
+                  >
+                    OPEN ORIGINAL QR UPI URI (unmodified)
+                  </a>
+                ) : null}
+              </div>
+              <p className="mt-2 text-[11px] text-muted">
+                If the ₹1 minimal link also fails in an app, the launch mechanism (or that app&apos;s handling of a
+                browser-triggered intent) is the problem, not QR parsing. If only the reconstructed payment fails but
+                the raw QR link succeeds, something is still altering the QR&apos;s bytes downstream.
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -546,6 +605,44 @@ function UpiDebugPanel({ debug }) {
           <p className="font-semibold text-muted">Final UPI URI (sent to the app)</p>
           <p className="break-all font-medium">{debug.finalUpiUri}</p>
         </div>
+        {debug.diff ? (
+          <div>
+            <p className="font-semibold text-muted">
+              Diff vs original: {debug.diff.identical ? "identical, byte-for-byte" : "DIFFERS — see below"}
+            </p>
+            {!debug.diff.identical ? (
+              <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                {debug.diff.missing.map((d) => (
+                  <li key={`m-${d.key}`}>
+                    missing <span className="font-medium">{d.key}</span> (was {d.was})
+                  </li>
+                ))}
+                {debug.diff.added.map((d) => (
+                  <li key={`a-${d.key}`}>
+                    added <span className="font-medium">{d.key}</span> = {d.now}
+                  </li>
+                ))}
+                {debug.diff.changed.map((d) => (
+                  <li key={`c-${d.key}`}>
+                    changed <span className="font-medium">{d.key}</span>: {d.was} → {d.now}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+        {debug.allOriginalParams ? (
+          <div>
+            <p className="font-semibold text-muted">All original QR params</p>
+            <pre className="mt-1 whitespace-pre-wrap break-all">{JSON.stringify(debug.allOriginalParams, null, 2)}</pre>
+          </div>
+        ) : null}
+        {debug.allFinalParams ? (
+          <div>
+            <p className="font-semibold text-muted">All final URI params</p>
+            <pre className="mt-1 whitespace-pre-wrap break-all">{JSON.stringify(debug.allFinalParams, null, 2)}</pre>
+          </div>
+        ) : null}
       </div>
     </details>
   );
