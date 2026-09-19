@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { initiateUpiPayment, confirmUpiPayment } from "@/lib/actions/upi-pay";
-import { parseUpiUri, isValidUpiId, validateUpiUri, logUpiDebug, getAllUpiParams, diffUpiUris, buildUpiUri } from "@/lib/upi";
+import { parseUpiUri, isValidUpiId, validateUpiUri, logUpiDebug, getAllUpiParams, buildUpiUri, UPI_DEBUG } from "@/lib/upi";
 import { formatCurrency } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 
@@ -24,7 +24,7 @@ import { useMounted } from "@/lib/useMounted";
 // private scheme (tez://, phonepe://, paytmmp://, …) bypasses that chooser,
 // locks the picker to whatever apps happen to be in this list, and isn't
 // needed — it used to exist here purely as a menu of shortcuts.
-const DEV = process.env.NODE_ENV !== "production";
+const DEV = UPI_DEBUG;
 
 function decodeQrFromFile(file) {
   return new Promise((resolve, reject) => {
@@ -344,7 +344,7 @@ export default function PayViaUpiFlow({ categories }) {
 
           {DEV ? (
             <div className="rounded-2xl border border-dashed border-border p-3">
-              <p className="text-xs font-semibold text-muted">Developer test tools (hidden in production)</p>
+              <p className="text-xs font-semibold text-muted">Developer test tools (NEXT_PUBLIC_UPI_DEBUG=1)</p>
               <p className="mt-1 text-[11px] text-muted">
                 Use these to isolate the launch mechanism from the QR&apos;s own parameters. Both open your phone&apos;s
                 UPI app chooser directly — check your browser/remote-debug console for the exact URI each one sends.
