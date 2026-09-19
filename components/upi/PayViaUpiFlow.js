@@ -11,23 +11,20 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { initiateUpiPayment, confirmUpiPayment } from "@/lib/actions/upi-pay";
-import { parseUpiUri, isValidUpiId, buildAppUpiUri } from "@/lib/upi";
+import { parseUpiUri, isValidUpiId, validateUpiUri, logUpiDebug } from "@/lib/upi";
 import { formatCurrency } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 
-// GPay, PhonePe, Paytm, BHIM and Amazon Pay each answer to their own custom
-// scheme (all accepting the same pa/pn/am/tn/tr params). Anything else —
-// including apps like INDmoney — still has to register the generic "upi://"
-// scheme to be UPI-compliant, so "Other UPI App" reaches those via whatever
-// chooser the phone's OS shows for that scheme.
-const UPI_APPS = [
-  { key: "gpay", label: "Google Pay", scheme: "tez://upi/pay" },
-  { key: "phonepe", label: "PhonePe", scheme: "phonepe://pay" },
-  { key: "paytm", label: "Paytm", scheme: "paytmmp://pay" },
-  { key: "bhim", label: "BHIM", scheme: "bhim://pay" },
-  { key: "amazonpay", label: "Amazon Pay", scheme: "amazonpay://pay" },
-  { key: "other", label: "Other UPI App", scheme: "upi://pay" },
-];
+// Every UPI-compliant app (Google Pay, PhonePe, Paytm, BHIM, Union Bank's own
+// app, etc.) registers itself as a handler for the generic "upi://pay"
+// scheme — that registration is what makes it "UPI-compliant" under NPCI's
+// spec. So the correct way to let the user pick ANY installed app is to
+// navigate to "upi://pay?..." directly and let Android's own OS-level intent
+// chooser list every app that can handle it. Hard-coding a specific app's
+// private scheme (tez://, phonepe://, paytmmp://, …) bypasses that chooser,
+// locks the picker to whatever apps happen to be in this list, and isn't
+// needed — it used to exist here purely as a menu of shortcuts.
+const DEV = process.env.NODE_ENV !== "production";
 
 function decodeQrFromFile(file) {
   return new Promise((resolve, reject) => {
@@ -68,7 +65,13 @@ export default function PayViaUpiFlow({ categories }) {
   const [confirmError, setConfirmError] = useState(null);
   const [confirmNote, setConfirmNote] = useState("");
   const [finalStatus, setFinalStatus] = useState(null);
-  const [chosenApp, setChosenApp] = useState(null);
+  // appOpened: user tapped the single "Pay with UPI" link and the browser
+  // handed off to Android's app chooser. returnedToTab: this page regained
+  // visibility afterwards (the user switched back, either mid-payment or
+  // after finishing) — we still can't tell which, hence PENDING not SUCCESS.
+  const [appOpened, setAppOpened] = useState(false);
+  const [returnedToTab, setReturnedToTab] = useState(false);
+  const [launchError, setLaunchError] = useState(null);
   const [scannedUri, setScannedUri] = useState(null);
   const [amountLocked, setAmountLocked] = useState(false);
   const fileInputRef = useRef(null);
@@ -78,9 +81,21 @@ export default function PayViaUpiFlow({ categories }) {
   const handleScan = useCallback((text) => {
     const parsed = parseUpiUri(text);
     if (!parsed) {
+      logUpiDebug("scan:rejected", { originalQrPayload: text });
       setScanError("That QR doesn't look like a UPI payment code. Try again or enter details manually.");
       return;
     }
+    logUpiDebug("scan:parsed", {
+      originalQrPayload: text,
+      parsedUpiUri: parsed.raw,
+      pa: parsed.pa,
+      pn: parsed.pn,
+      am: parsed.am,
+      cu: parsed.cu,
+      tn: parsed.tn,
+      tr: parsed.tr,
+      mc: parsed.mc,
+    });
     setPayeeUpi(parsed.pa);
     setPayeeName(parsed.pn || "");
     if (parsed.am) setAmount(String(parsed.am));
@@ -114,7 +129,31 @@ export default function PayViaUpiFlow({ categories }) {
   }
 
   const awaitingConfirmation = Boolean(initState?.success);
-  const showAppChooser = awaitingConfirmation && !finalStatus && isMobile && !chosenApp;
+  const showLaunchScreen = awaitingConfirmation && !finalStatus && isMobile && !appOpened;
+
+  // The 7 states this flow can be in. Only INITIATED/APP_OPENED/PENDING are
+  // ever inferred client-side — SUCCESS/CANCELLED come from the user's own
+  // explicit answer, never assumed just because the UPI app opened (see
+  // lib/upi.js for why the browser can't observe the real outcome).
+  const paymentState = !awaitingConfirmation
+    ? null
+    : finalStatus === "paid"
+      ? "SUCCESS"
+      : finalStatus === "cancelled"
+        ? "CANCELLED"
+        : launchError
+          ? "FAILED"
+          : confirmError
+            ? "UNKNOWN"
+            : returnedToTab
+              ? "PENDING"
+              : appOpened
+                ? "APP_OPENED"
+                : "INITIATED";
+
+  useEffect(() => {
+    if (paymentState) logUpiDebug("state", paymentState);
+  }, [paymentState]);
 
   useEffect(() => {
     if (!awaitingConfirmation || !initState?.upiUri) return;
@@ -122,6 +161,38 @@ export default function PayViaUpiFlow({ categories }) {
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(null));
   }, [awaitingConfirmation, initState]);
+
+  // Detects "the user came back to this tab" so an app-opened payment can be
+  // shown as PENDING instead of silently staying APP_OPENED forever — it does
+  // NOT mean the payment succeeded, only that we can now ask the user.
+  useEffect(() => {
+    if (!appOpened || finalStatus) return;
+    function handleVisibility() {
+      if (document.visibilityState === "visible") setReturnedToTab(true);
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [appOpened, finalStatus]);
+
+  // Fires directly inside the <a>'s click handler — a same-tick response to
+  // the user's own tap, not a callback queued after some unrelated async
+  // work — which is what lets Android Chrome treat the upi://pay navigation
+  // as a trusted user gesture and hand off to the OS app chooser.
+  function handleLaunchClick(e) {
+    const uri = initState?.upiUri;
+    const check = validateUpiUri(uri);
+    logUpiDebug("launch", { finalUpiUri: uri, valid: check.valid, reason: check.reason });
+    if (!check.valid) {
+      e.preventDefault();
+      setLaunchError(`Couldn't verify this payment link (${check.reason}). Please rescan the QR code.`);
+      return;
+    }
+    setLaunchError(null);
+    setAppOpened(true);
+    // No e.preventDefault(): the anchor's own href navigation is what opens
+    // the UPI app, so the browser handles it as a direct, top-level,
+    // user-gesture-driven deep link — no window.location/intent:// needed.
+  }
 
   function resolvePayment(status) {
     setConfirmError(null);
@@ -278,7 +349,7 @@ export default function PayViaUpiFlow({ categories }) {
             <p className="text-xs font-medium">If your bank rejects this (&quot;exceeded bank limit&quot;, etc.):</p>
             <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-muted">
               <li>Banks apply lower limits to first-time payees for ~24 hours — try again later, or use a payee you&apos;ve paid before.</li>
-              <li>Try a different app from the next screen — GPay, PhonePe and Paytm can each apply different limits for the same payee.</li>
+              <li>Try again and pick a different app from your phone&apos;s picker — apps can apply different limits for the same payee.</li>
               <li>This is a bank-side decision, not something this app controls — the payment isn&apos;t lost, it simply never left your account.</li>
             </ul>
           </div>
@@ -293,35 +364,30 @@ export default function PayViaUpiFlow({ categories }) {
         </form>
       ) : null}
 
-      {showAppChooser ? (
+      {showLaunchScreen ? (
         <div className="mt-6">
           <div className="rounded-2xl bg-surface p-4 text-center">
             <p className="text-sm text-muted">Pay</p>
             <p className="mt-1 text-2xl font-bold">{formatCurrency(initState.amount)}</p>
             <p className="mt-1 text-sm text-muted">to {initState.payeeName}</p>
           </div>
-          <p className="mt-5 text-xs font-medium text-muted">Choose an app to pay with</p>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            {UPI_APPS.map((app) => (
-              <button
-                key={app.key}
-                type="button"
-                onClick={() => {
-                  setChosenApp(app.key);
-                  window.location.href = buildAppUpiUri(initState.upiUri, app.scheme);
-                }}
-                className="flex flex-col items-center gap-1.5 rounded-2xl border border-border bg-surface py-3.5"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-light text-sm font-bold text-primary-dark">
-                  {app.label.charAt(0)}
-                </span>
-                <span className="text-center text-[11px] font-medium leading-tight">{app.label}</span>
-              </button>
-            ))}
-          </div>
+          {launchError ? <p className="mt-4 text-xs font-medium text-danger">{launchError}</p> : null}
+          {/* A real <a href="upi://pay?..."> click, not window.location/intent:// —
+              this is what lets Android Chrome hand off to its own OS-level app
+              chooser, listing every installed UPI-compliant app (Google Pay,
+              PhonePe, Paytm, BHIM, your bank's app, …) rather than a fixed list
+              this code picks for you. */}
+          <a
+            href={initState.upiUri}
+            onClick={handleLaunchClick}
+            className="mt-5 flex w-full items-center justify-center rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25"
+          >
+            Open UPI App to Pay {formatCurrency(initState.amount)}
+          </a>
           <p className="mt-4 text-center text-xs text-muted">
-            Don&apos;t see your app? &quot;Other UPI App&quot; opens your phone&apos;s own app picker.
+            Your phone will ask which app to use — pick any UPI app you have installed.
           </p>
+          {DEV && initState?.debug ? <UpiDebugPanel debug={initState.debug} /> : null}
         </div>
       ) : awaitingConfirmation ? (
         <div className="mt-10 flex flex-col items-center text-center">
@@ -346,9 +412,11 @@ export default function PayViaUpiFlow({ categories }) {
           ) : (
             <>
               <p className="text-sm font-medium">
-                {isMobile
-                  ? "Complete the payment in your UPI app. Do not close this page until you return."
-                  : "Ready to pay"}
+                {!isMobile
+                  ? "Ready to pay"
+                  : returnedToTab
+                    ? "Welcome back — we still can't tell if the payment went through. Please confirm below."
+                    : "Complete the payment in your UPI app. Do not close this page until you return."}
               </p>
               <p className="mt-3 text-2xl font-bold">{formatCurrency(initState.amount)}</p>
               <p className="mt-1 text-sm text-muted">to {initState.payeeName}</p>
@@ -412,8 +480,16 @@ export default function PayViaUpiFlow({ categories }) {
               </div>
 
               {isMobile ? (
-                <button type="button" onClick={() => setChosenApp(null)} className="mt-4 text-xs font-semibold text-primary">
-                  Try a different app
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAppOpened(false);
+                    setReturnedToTab(false);
+                    setLaunchError(null);
+                  }}
+                  className="mt-4 text-xs font-semibold text-primary"
+                >
+                  Open UPI app again
                 </button>
               ) : null}
             </>
@@ -430,5 +506,47 @@ function ConfirmRow({ label, value }) {
       <span className="text-muted">{label}</span>
       <span className="max-w-[60%] truncate text-right font-medium">{value}</span>
     </div>
+  );
+}
+
+// Dev-only: lets you compare the original QR payload against the exact URI
+// this app is about to hand to the UPI app, field by field. Never rendered
+// in production (gated by DEV at the call site).
+function UpiDebugPanel({ debug }) {
+  const rows = [
+    ["PA", debug.pa],
+    ["PN", debug.pn],
+    ["AM", debug.am],
+    ["CU", debug.cu],
+    ["TN", debug.tn],
+    ["TR", debug.tr],
+    ["MC", debug.mc],
+  ];
+  return (
+    <details className="mt-5 rounded-2xl border border-dashed border-border p-3 text-left text-xs">
+      <summary className="cursor-pointer font-semibold text-muted">Debug: QR → parsed → final URI</summary>
+      <div className="mt-2 space-y-2">
+        <div>
+          <p className="font-semibold text-muted">Original QR payload</p>
+          <p className="break-all">{debug.originalQrPayload || "(none — manual entry)"}</p>
+        </div>
+        <div>
+          <p className="font-semibold text-muted">Parsed UPI URI</p>
+          <p className="break-all">{debug.parsedUpiUri || "(none — manual entry)"}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-2">
+              <span className="text-muted">{label}</span>
+              <span className="truncate font-medium">{value ?? "—"}</span>
+            </div>
+          ))}
+        </div>
+        <div>
+          <p className="font-semibold text-muted">Final UPI URI (sent to the app)</p>
+          <p className="break-all font-medium">{debug.finalUpiUri}</p>
+        </div>
+      </div>
+    </details>
   );
 }
