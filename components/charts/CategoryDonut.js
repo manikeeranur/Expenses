@@ -1,6 +1,6 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCurrency } from "@/lib/format";
 
 export default function CategoryDonut({ data, total }) {
@@ -21,6 +21,10 @@ export default function CategoryDonut({ data, total }) {
               <Cell key={d._id} fill={d.color} />
             ))}
           </Pie>
+          <Tooltip
+            formatter={(value, name) => [formatCurrency(value), name]}
+            contentStyle={{ borderRadius: 12, border: "1px solid #ecebf5", fontSize: 12 }}
+          />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">

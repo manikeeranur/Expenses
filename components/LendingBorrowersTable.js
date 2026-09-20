@@ -12,7 +12,22 @@ import DownloadLendingPdf from "@/components/DownloadLendingPdf";
 import LendingForm from "@/components/LendingForm";
 import SendReminderButton from "@/components/SendReminderButton";
 import { formatCurrencyPrecise, formatDateShort, daysSince, ordinal } from "@/lib/format";
+import { getNextDueInfo } from "@/lib/lending";
 import { setLendingStatus, deleteLending, sendReminder, updateLending, reorderLendings } from "@/lib/actions/lending";
+
+function DueBadge({ l }) {
+  const info = getNextDueInfo(l);
+  if (!info) return <span className="text-xs text-muted">—</span>;
+  const overdue = info.diffDays < 0;
+  return (
+    <div className="text-xs">
+      <p className="font-medium text-foreground">{formatDateShort(info.due)}</p>
+      <p className={overdue ? "font-semibold text-danger" : "text-muted"}>
+        {overdue ? `Overdue ${Math.abs(info.diffDays)}d` : `${info.diffDays} days`}
+      </p>
+    </div>
+  );
+}
 
 // Cards and the table can't both be mounted at once — dnd-kit's useSortable
 // registers each item id once, so rendering both (even with one CSS-hidden)
@@ -77,8 +92,10 @@ function SortableRow({ l }) {
           </div>
         </div>
       </td>
-      <td className="py-3 text-sm font-semibold text-danger">{formatCurrencyPrecise(l.principal)}</td>
-      <td className="py-3 text-sm font-semibold text-success">{formatCurrencyPrecise(l.principalRepaid)}</td>
+      <td className="py-3">
+        <p className="text-sm font-semibold text-danger">{formatCurrencyPrecise(l.principal)}</p>
+        <p className="text-[11px] text-success">Paid {formatCurrencyPrecise(l.principalRepaid)}</p>
+      </td>
       <td className="py-3 text-sm font-semibold text-warning">{formatCurrencyPrecise(l.outstanding)}</td>
       <td className="py-3 text-sm font-semibold text-info">{formatCurrencyPrecise(l.interest)}</td>
       <td className="py-3 text-sm text-muted">
@@ -90,6 +107,9 @@ function SortableRow({ l }) {
             {l.interestDueDay ? <span className="block text-[11px] text-muted">{ordinal(l.interestDueDay)} of month</span> : null}
           </>
         )}
+      </td>
+      <td className="py-3">
+        <DueBadge l={l} />
       </td>
       <td className="py-3">
         <Tag tone={l.status === "closed" ? "neutral" : "success"}>{l.status === "closed" ? "Closed" : "Active"}</Tag>
@@ -203,10 +223,10 @@ export default function LendingBorrowersTable({ summaries }) {
               <tr className="border-b border-border">
                 <th className="pb-2 text-[11px] font-medium text-muted">Borrower</th>
                 <th className="pb-2 text-[11px] font-medium text-muted">Principal</th>
-                <th className="pb-2 text-[11px] font-medium text-muted">Principal Paid</th>
                 <th className="pb-2 text-[11px] font-medium text-muted">Outstanding</th>
                 <th className="pb-2 text-[11px] font-medium text-muted">Interest Collected</th>
                 <th className="pb-2 text-[11px] font-medium text-muted">Monthly Due</th>
+                <th className="pb-2 text-[11px] font-medium text-muted">Next Due Date</th>
                 <th className="pb-2 text-[11px] font-medium text-muted">Status</th>
                 <th className="pb-2 text-right text-[11px] font-medium text-muted">Actions</th>
               </tr>
