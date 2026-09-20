@@ -255,7 +255,7 @@ export default async function LendingPage() {
                   <p className="text-xs text-white/75">Track your lending, collect on time and achieve your financial goals.</p>
                 </div>
               </div>
-              <LendingForm action={createLending} mode="create" variant="pill" className="shrink-0" />
+              <LendingForm action={createLending} mode="create" variant="pill" className="shrink-0 text-[#6d5ce7]" />
             </div>
           </div>
         </div>

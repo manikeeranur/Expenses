@@ -1,19 +1,17 @@
 "use client";
 
 import { Download } from "lucide-react";
-import { formatDateShort, daysSince, ordinal } from "@/lib/format";
+import { formatDateShort, daysSince } from "@/lib/format";
 
-const RED = [225, 60, 65];
-const GREEN = [30, 165, 90];
-const ORANGE = [235, 160, 40];
-const BLUE = [55, 120, 220];
-const GRAY = [145, 145, 155];
+const GRAY = [130, 130, 140];
 const INK = [25, 25, 35];
+const BORDER = [220, 220, 226];
+const LABEL_FILL = [244, 244, 247];
 
 const SIZE_BODY = 9;
-const SIZE_EMPHASIS = 11;
-const SIZE_TITLE = 14;
-const SIZE_NAME = 20;
+const SIZE_SECTION = 11;
+const SIZE_TITLE = 18;
+const SIZE_CAPTION = 9;
 
 function formatAmountPdf(amount) {
   return `Rs. ${Number(amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -27,83 +25,81 @@ function sanitizeForPdf(text) {
   return String(text).replace(/₹/g, "Rs. ");
 }
 
-function statRow(doc, margin, contentWidth, y, label, value, color) {
-  doc.setTextColor(...GRAY);
-  doc.setFontSize(SIZE_BODY);
-  doc.setFont(undefined, "normal");
-  doc.text(label, margin, y);
-  doc.setTextColor(...color);
-  doc.setFontSize(SIZE_EMPHASIS);
-  doc.setFont(undefined, "bold");
-  doc.text(value, margin + contentWidth, y, { align: "right" });
-  return y + 10;
+// A short prose line describing the principal side of the loan — mirrors
+// how a human would summarize it on a statement, not just a raw table row.
+function buildSettlementNarrative(lending, principalPayments, totalPrincipalPaid, outstanding) {
+  if (!principalPayments.length) {
+    return `No principal repayments have been recorded yet for ${lending.borrower}. The full principal of ${formatAmountPdf(
+      lending.principal
+    )} remains outstanding, as recorded in the lending sheet.`;
+  }
+  if (principalPayments.length === 1) {
+    const p = principalPayments[0];
+    return `${formatAmountPdf(p.amount)} of the principal was settled to ${lending.borrower} on ${formatDateShort(
+      p.date
+    )}, leaving ${formatAmountPdf(outstanding)} outstanding, as recorded in the lending sheet.`;
+  }
+  const last = principalPayments[principalPayments.length - 1];
+  return `A total of ${formatAmountPdf(totalPrincipalPaid)} has been settled across ${principalPayments.length} payments (latest on ${formatDateShort(
+    last.date
+  )}), leaving ${formatAmountPdf(outstanding)} outstanding, as recorded in the lending sheet.`;
 }
 
-function dashedRule(doc, margin, contentWidth, y) {
-  doc.setDrawColor(225, 225, 230);
-  doc.setLineWidth(0.3);
-  doc.setLineDashPattern([1.2, 1], 0);
-  doc.line(margin, y, margin + contentWidth, y);
-  doc.setLineDashPattern([], 0);
+function keyValueTable(doc, autoTable, rows, startY, margin, contentWidth, labelWidthPct) {
+  autoTable(doc, {
+    startY,
+    margin: { left: margin, right: margin },
+    tableWidth: contentWidth,
+    theme: "grid",
+    body: rows,
+    styles: { fontSize: SIZE_BODY, textColor: INK, lineColor: BORDER, lineWidth: 0.2, cellPadding: 3 },
+    columnStyles: {
+      0: { cellWidth: contentWidth * labelWidthPct, fillColor: LABEL_FILL, textColor: INK, fontStyle: "bold" },
+      1: { halign: "right", fontStyle: "bold" },
+    },
+  });
+  return doc.lastAutoTable.finalY;
+}
+
+function paymentTable(doc, autoTable, payments, startY, margin, contentWidth, emptyLabel) {
+  autoTable(doc, {
+    startY,
+    margin: { left: margin, right: margin },
+    tableWidth: contentWidth,
+    theme: "grid",
+    head: [["Date", "Method", "Remarks", "Amount"]],
+    body: payments.length
+      ? payments.map((p) => [formatDateShort(p.date), p.method === "upi" ? "UPI" : "Cash", sanitizeForPdf(p.remarks) || "—", formatAmountPdf(p.amount)])
+      : [["—", "—", emptyLabel, "—"]],
+    styles: { fontSize: SIZE_BODY, textColor: INK, lineColor: BORDER, lineWidth: 0.2, cellPadding: 3 },
+    headStyles: { fillColor: LABEL_FILL, textColor: INK, fontStyle: "bold" },
+    columnStyles: { 3: { halign: "right" } },
+  });
+  return doc.lastAutoTable.finalY;
+}
+
+function sectionHeading(doc, text, margin, y) {
+  doc.setFont(undefined, "bold");
+  doc.setFontSize(SIZE_SECTION);
+  doc.setTextColor(...INK);
+  doc.text(text, margin, y);
+  return y + 5;
 }
 
 function drawFooter(doc, margin, contentWidth, pageHeight) {
   const y = pageHeight - 14;
-  doc.setDrawColor(225, 225, 230);
+  doc.setDrawColor(...BORDER);
   doc.setLineWidth(0.3);
   doc.line(margin, y - 5, margin + contentWidth, y - 5);
 
   doc.setFontSize(SIZE_BODY);
   doc.setTextColor(...GRAY);
   doc.setFont(undefined, "normal");
-  doc.text(
-    `Generated on ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}   |   Monthly Expenses`,
-    margin,
-    y
-  );
+  doc.text(`Generated on ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`, margin, y);
 
-  doc.setFontSize(SIZE_BODY);
-  doc.setFont(undefined, "italic");
-  doc.setTextColor(...INK);
-  doc.text("Thank You!", margin + contentWidth, y, { align: "right" });
-}
-
-function paymentTable(doc, autoTable, title, payments, startY, margin, contentWidth, amountColor, emptyLabel) {
-  doc.setFontSize(SIZE_EMPHASIS);
   doc.setFont(undefined, "bold");
   doc.setTextColor(...INK);
-  doc.text(title, margin, startY);
-
-  autoTable(doc, {
-    startY: startY + 5,
-    margin: { left: margin, right: margin },
-    tableWidth: contentWidth,
-    head: [["Date", "Method", "Remarks", "Amount"]],
-    body: payments.length
-      ? payments.map((p) => [formatDateShort(p.date), p.method === "upi" ? "UPI" : "Cash", sanitizeForPdf(p.remarks) || "—", formatAmountPdf(p.amount)])
-      : [["—", "—", emptyLabel, "—"]],
-    theme: "plain",
-    styles: { fontSize: SIZE_BODY, cellPadding: { top: 3, bottom: 3, left: 0, right: 0 }, textColor: INK },
-    headStyles: { textColor: GRAY, fontStyle: "normal", fontSize: SIZE_BODY },
-    bodyStyles: { lineColor: [232, 232, 236], lineWidth: { bottom: 0.2 } },
-    columnStyles: {
-      0: { cellWidth: 28 },
-      1: { cellWidth: 26, fontStyle: "bold" },
-      2: { cellWidth: "auto" },
-      3: { cellWidth: 34, halign: "right", fontStyle: "bold" },
-    },
-    didParseCell: (data) => {
-      if (data.section === "head") {
-        data.cell.styles.lineWidth = { bottom: 0.4 };
-        data.cell.styles.lineColor = [210, 210, 216];
-      }
-      if (data.section === "body" && data.column.index === 3 && payments.length) {
-        data.cell.styles.textColor = amountColor;
-      }
-    },
-  });
-
-  return doc.lastAutoTable.finalY;
+  doc.text("Monthly Expenses", margin + contentWidth, y, { align: "right" });
 }
 
 async function generateLendingPdf(lending) {
@@ -111,7 +107,7 @@ async function generateLendingPdf(lending) {
   const { default: autoTable } = await import("jspdf-autotable");
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const margin = 16;
+  const margin = 10;
   const pageWidth = doc.internal.pageSize.getWidth();
   const contentWidth = pageWidth - margin * 2;
 
@@ -123,81 +119,81 @@ async function generateLendingPdf(lending) {
   const expectedMonthlyInterest = Math.round((outstanding * (lending.interestRatePercent || 0)) / 100);
   const isClosed = lending.status === "closed";
 
-  // Title
-  doc.setTextColor(...INK);
-  doc.setFontSize(SIZE_TITLE);
+  let y = 14;
+
   doc.setFont(undefined, "bold");
-  doc.setCharSpace(1.1);
-  doc.text("LENDING STATEMENT", pageWidth / 2, 20, { align: "center" });
-  doc.setCharSpace(0);
-
-  doc.setDrawColor(220, 220, 226);
-  doc.setLineWidth(0.4);
-  doc.line(margin, 26, margin + contentWidth, 26);
-
-  // Borrower name + status pill
-  doc.setFontSize(SIZE_NAME);
-  doc.setFont(undefined, "bold");
-  doc.setTextColor(...INK);
-  doc.text(lending.borrower, margin, 38);
-
-  const statusLabel = isClosed ? "CLOSED" : "ACTIVE";
-  const statusColor = isClosed ? GRAY : GREEN;
-  doc.setFontSize(SIZE_BODY);
-  doc.setFont(undefined, "bold");
-  const pillW = doc.getTextWidth(statusLabel) + 10;
-  const pillX = margin + contentWidth - pillW;
-  doc.setFillColor(...(isClosed ? [238, 238, 242] : [223, 247, 232]));
-  doc.roundedRect(pillX, 31, pillW, 8, 4, 4, "F");
-  doc.setTextColor(...statusColor);
-  doc.text(statusLabel, pillX + pillW / 2, 36.3, { align: "center" });
-
-  // Subtitle
-  doc.setFontSize(SIZE_BODY);
-  doc.setFont(undefined, "normal");
+  doc.setFontSize(SIZE_CAPTION);
   doc.setTextColor(...GRAY);
-  doc.text(
-    `${lending.mobile || "No mobile"}   |   Given on ${formatDateShort(lending.dateGiven)}   |   ${daysSince(lending.dateGiven)} days ago`,
+  doc.setCharSpace(0.8);
+  doc.text("MONTHLY EXPENSES", pageWidth / 2, y, { align: "center" });
+  doc.setCharSpace(0);
+  y += 9;
+
+  doc.setFontSize(SIZE_TITLE);
+  doc.setTextColor(...INK);
+  doc.setCharSpace(1);
+  doc.text("LENDING STATEMENT", pageWidth / 2, y, { align: "center" });
+  doc.setCharSpace(0);
+  y += 6;
+
+  doc.setFont(undefined, "normal");
+  doc.setFontSize(SIZE_CAPTION);
+  doc.setTextColor(...GRAY);
+  doc.text("Detailed statement of lending, repayments and interest", pageWidth / 2, y, { align: "center" });
+  y += 10;
+
+  y = keyValueTable(
+    doc,
+    autoTable,
+    [
+      ["Borrower", lending.borrower],
+      ["Status", isClosed ? "CLOSED" : "ACTIVE"],
+      ["Given on", `${formatDateShort(lending.dateGiven)} • ${daysSince(lending.dateGiven)} days ago`],
+      ["Contact", lending.mobile || "No mobile number"],
+    ],
+    y,
     margin,
-    45
+    contentWidth,
+    0.35
   );
+  y += 8;
 
-  let y = 60;
+  y = sectionHeading(doc, "LOAN SUMMARY", margin, y);
+  y = keyValueTable(
+    doc,
+    autoTable,
+    [
+      ["Principal", formatAmountPdf(lending.principal)],
+      ["Principal Paid", formatAmountPdf(totalPrincipalPaid)],
+      ["Outstanding", formatAmountPdf(outstanding)],
+      ["Interest Collected", formatAmountPdf(totalInterest)],
+      ["Interest Rate", `${lending.interestRatePercent || 0}% / month`],
+      ["Expected Monthly Interest", formatAmountPdf(expectedMonthlyInterest)],
+    ],
+    y,
+    margin,
+    contentWidth,
+    0.5
+  );
+  y += 8;
 
-  y = statRow(doc, margin, contentWidth, y, "Principal (Asal)", formatAmountPdf(lending.principal), RED);
-  y = statRow(doc, margin, contentWidth, y, "Principal Paid", formatAmountPdf(totalPrincipalPaid), GREEN);
-  y = statRow(doc, margin, contentWidth, y, "Outstanding", formatAmountPdf(outstanding), ORANGE);
+  y = sectionHeading(doc, "SETTLEMENT DETAILS", margin, y);
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    tableWidth: contentWidth,
+    theme: "grid",
+    body: [[buildSettlementNarrative(lending, principalPayments, totalPrincipalPaid, outstanding)]],
+    styles: { fontSize: SIZE_BODY, textColor: INK, lineColor: BORDER, lineWidth: 0.2, cellPadding: 4 },
+  });
+  y = doc.lastAutoTable.finalY + 8;
 
-  dashedRule(doc, margin, contentWidth, y - 4);
+  y = sectionHeading(doc, "INTEREST PAYMENTS", margin, y);
+  y = paymentTable(doc, autoTable, interestPayments, y, margin, contentWidth, "No interest payments logged yet.");
+  y += 8;
 
-  y = statRow(doc, margin, contentWidth, y, "Interest Collected", formatAmountPdf(totalInterest), BLUE);
-  y = statRow(doc, margin, contentWidth, y, "Interest Rate", `${lending.interestRatePercent || 0}% / month`, BLUE);
-  y = statRow(doc, margin, contentWidth, y, "Expected Monthly Interest", formatAmountPdf(expectedMonthlyInterest), BLUE);
-
-  dashedRule(doc, margin, contentWidth, y - 4);
-  y += 3;
-
-  if (lending.interestDueDay) {
-    doc.setFontSize(SIZE_BODY);
-    doc.setTextColor(...GRAY);
-    doc.setFont(undefined, "normal");
-    doc.text(`Interest due on the ${ordinal(lending.interestDueDay)} of every month.`, margin, y);
-    y += 7;
-  }
-
-  if (lending.note) {
-    const noteLines = doc.splitTextToSize(sanitizeForPdf(lending.note), contentWidth);
-    doc.setFontSize(SIZE_BODY);
-    doc.setTextColor(...GRAY);
-    doc.setFont(undefined, "normal");
-    doc.text(noteLines, margin, y);
-    y += noteLines.length * 5.5 + 4;
-  }
-
-  y += 5;
-
-  y = paymentTable(doc, autoTable, "Interest Payments", interestPayments, y, margin, contentWidth, BLUE, "No interest payments logged yet.");
-  paymentTable(doc, autoTable, "Principal Payments", principalPayments, y + 12, margin, contentWidth, GREEN, "No principal payments logged yet.");
+  y = sectionHeading(doc, "PRINCIPAL PAYMENTS", margin, y);
+  paymentTable(doc, autoTable, principalPayments, y, margin, contentWidth, "No principal payments logged yet.");
 
   // Same footer on every page, not just the last one.
   const pageHeight = doc.internal.pageSize.getHeight();
