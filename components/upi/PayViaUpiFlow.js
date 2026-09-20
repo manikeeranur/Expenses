@@ -2,7 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { X, Check, Camera, KeyRound, Copy, Upload } from "lucide-react";
+import { X, Check, Camera, KeyRound, Copy, Upload, ShieldCheck } from "lucide-react";
 import jsQR from "jsqr";
 import QRCode from "qrcode";
 import UpiQrScanner from "@/components/upi/UpiQrScanner";
@@ -366,13 +366,14 @@ export default function PayViaUpiFlow({ categories }) {
             opening the app alone doesn&apos;t count.
           </p>
 
-          <div className="rounded-2xl bg-warning-light p-3">
-            <p className="text-xs font-medium">If your bank rejects this (&quot;exceeded bank limit&quot;, etc.):</p>
-            <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-muted">
-              <li>Banks apply lower limits to first-time payees for ~24 hours — try again later, or use a payee you&apos;ve paid before.</li>
-              <li>Try again and pick a different app from your phone&apos;s picker — apps can apply different limits for the same payee.</li>
-              <li>This is a bank-side decision, not something this app controls — the payment isn&apos;t lost, it simply never left your account.</li>
-            </ul>
+          <div className="flex items-center gap-3 rounded-2xl bg-black p-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
+              <ShieldCheck size={20} className="text-white" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white">Use the CRED app</p>
+              <p className="text-xs text-white/60">For the smoothest, most reliable UPI payment experience</p>
+            </div>
           </div>
 
           <button
@@ -408,7 +409,6 @@ export default function PayViaUpiFlow({ categories }) {
           <p className="mt-4 text-center text-xs text-muted">
             Your phone will ask which app to use — pick any UPI app you have installed.
           </p>
-          {DEV && initState?.debug ? <UpiDebugPanel debug={initState.debug} /> : null}
         </div>
       ) : awaitingConfirmation ? (
         <div className="mt-10 flex flex-col items-center text-center">
@@ -530,82 +530,3 @@ function ConfirmRow({ label, value }) {
   );
 }
 
-// Dev-only: lets you compare the original QR payload against the exact URI
-// this app is about to hand to the UPI app, field by field. Never rendered
-// in production (gated by DEV at the call site).
-function UpiDebugPanel({ debug }) {
-  const rows = [
-    ["PA", debug.pa],
-    ["PN", debug.pn],
-    ["AM", debug.am],
-    ["CU", debug.cu],
-    ["TN", debug.tn],
-    ["TR", debug.tr],
-    ["MC", debug.mc],
-  ];
-  return (
-    <details className="mt-5 rounded-2xl border border-dashed border-border p-3 text-left text-xs">
-      <summary className="cursor-pointer font-semibold text-muted">Debug: QR → parsed → final URI</summary>
-      <div className="mt-2 space-y-2">
-        <div>
-          <p className="font-semibold text-muted">Original QR payload</p>
-          <p className="break-all">{debug.originalQrPayload || "(none — manual entry)"}</p>
-        </div>
-        <div>
-          <p className="font-semibold text-muted">Parsed UPI URI</p>
-          <p className="break-all">{debug.parsedUpiUri || "(none — manual entry)"}</p>
-        </div>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-          {rows.map(([label, value]) => (
-            <div key={label} className="flex justify-between gap-2">
-              <span className="text-muted">{label}</span>
-              <span className="truncate font-medium">{value ?? "—"}</span>
-            </div>
-          ))}
-        </div>
-        <div>
-          <p className="font-semibold text-muted">Final UPI URI (sent to the app)</p>
-          <p className="break-all font-medium">{debug.finalUpiUri}</p>
-        </div>
-        {debug.diff ? (
-          <div>
-            <p className="font-semibold text-muted">
-              Diff vs original: {debug.diff.identical ? "identical, byte-for-byte" : "DIFFERS — see below"}
-            </p>
-            {!debug.diff.identical ? (
-              <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                {debug.diff.missing.map((d) => (
-                  <li key={`m-${d.key}`}>
-                    missing <span className="font-medium">{d.key}</span> (was {d.was})
-                  </li>
-                ))}
-                {debug.diff.added.map((d) => (
-                  <li key={`a-${d.key}`}>
-                    added <span className="font-medium">{d.key}</span> = {d.now}
-                  </li>
-                ))}
-                {debug.diff.changed.map((d) => (
-                  <li key={`c-${d.key}`}>
-                    changed <span className="font-medium">{d.key}</span>: {d.was} → {d.now}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
-        {debug.allOriginalParams ? (
-          <div>
-            <p className="font-semibold text-muted">All original QR params</p>
-            <pre className="mt-1 whitespace-pre-wrap break-all">{JSON.stringify(debug.allOriginalParams, null, 2)}</pre>
-          </div>
-        ) : null}
-        {debug.allFinalParams ? (
-          <div>
-            <p className="font-semibold text-muted">All final URI params</p>
-            <pre className="mt-1 whitespace-pre-wrap break-all">{JSON.stringify(debug.allFinalParams, null, 2)}</pre>
-          </div>
-        ) : null}
-      </div>
-    </details>
-  );
-}
