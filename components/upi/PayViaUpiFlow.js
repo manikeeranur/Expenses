@@ -10,7 +10,7 @@ import CategorySelect from "@/components/ui/CategorySelect";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { initiateUpiPayment, confirmUpiPayment } from "@/lib/actions/upi-pay";
+import { initiateUpiPayment, confirmUpiPayment, lookupPayeeName } from "@/lib/actions/upi-pay";
 import { parseUpiUri, isValidUpiId, validateUpiUri, logUpiDebug, getAllUpiParams, UPI_DEBUG } from "@/lib/upi";
 import { formatCurrency } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
@@ -108,12 +108,25 @@ export default function PayViaUpiFlow({ categories }) {
     setAmountLocked(parsed.am != null);
     setScanError("");
     setStep("details");
+
+    // The QR's own "pn" is often a generic aggregator/POS name, not the real
+    // business name — if this UPI ID was renamed on a past payment, prefer
+    // that over whatever this scan just gave us.
+    lookupPayeeName(parsed.pa).then((res) => {
+      if (res?.name) setPayeeName(res.name);
+    });
   }, []);
 
   function goToManualEntry() {
     setScannedUri(null);
     setAmountLocked(false);
     setStep("manual");
+  }
+
+  async function continueFromManual() {
+    const saved = await lookupPayeeName(payeeUpi.trim());
+    if (saved?.name && !payeeName.trim()) setPayeeName(saved.name);
+    setStep("details");
   }
 
   async function handleFileUpload(e) {
@@ -286,7 +299,7 @@ export default function PayViaUpiFlow({ categories }) {
           <button
             type="button"
             disabled={!canContinueManual}
-            onClick={() => setStep("details")}
+            onClick={continueFromManual}
             className="flex w-full items-center justify-center rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 disabled:opacity-50"
           >
             Continue
@@ -296,9 +309,17 @@ export default function PayViaUpiFlow({ categories }) {
 
       {step === "details" ? (
         <div className="mt-6 space-y-4">
-          <div className="rounded-2xl bg-surface p-3 text-sm">
-            Paying <span className="font-semibold">{payeeName || payeeUpi}</span>
-            <span className="block text-xs text-muted">{payeeUpi}</span>
+          <div>
+            <Label>Payee Name</Label>
+            <Input
+              value={payeeName}
+              onChange={(e) => setPayeeName(e.target.value)}
+              placeholder={payeeUpi}
+            />
+            <p className="mt-1.5 text-xs text-muted">
+              {payeeUpi}
+              {scannedUri ? " · this QR's own label — edit it if it looks wrong, it won't change where the money goes" : ""}
+            </p>
           </div>
           <div>
             <Label>Amount</Label>

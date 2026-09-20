@@ -114,6 +114,7 @@ function TransactionTable({ transactions, net }) {
                             </span>
                             {statusTag ? <Tag tone={statusTag.tone}>{statusTag.label}</Tag> : null}
                           </div>
+                          {t.description ? <p className="mt-0.5 truncate text-xs text-muted">{t.description}</p> : null}
                         </div>
                         <span className={`shrink-0 text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
                           {isIncome ? "+" : "-"}
@@ -157,6 +158,7 @@ function TransactionTable({ transactions, net }) {
                       <td className="truncate py-3 text-sm text-muted">
                         {formatDateShort(t.date)}
                         <span className="block truncate text-[11px] text-muted">{t.title}</span>
+                        {t.description ? <span className="block truncate text-[11px] text-muted">{t.description}</span> : null}
                       </td>
                       <td className="py-3">
                         <div className="flex min-w-0 items-center gap-2">

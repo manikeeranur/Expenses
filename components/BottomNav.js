@@ -22,15 +22,14 @@ export default function BottomNav() {
           const active = pathname === href;
           return (
             <li key={href}>
-              <Link
-                href={href}
-                aria-label={label}
-                className={`flex flex-col items-center gap-1 px-3 py-1.5 text-[11px] font-medium ${
-                  active ? "text-primary" : "text-muted"
-                }`}
-              >
-                <Icon size={22} stroke={active ? 2.25 : 1.75} />
-                {label}
+              <Link href={href} aria-label={label} className="flex items-center justify-center px-3 py-1">
+                <span
+                  className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${
+                    active ? "bg-primary-light text-primary" : "text-muted"
+                  }`}
+                >
+                  <Icon size={22} stroke={active ? 2.25 : 1.75} />
+                </span>
               </Link>
             </li>
           );

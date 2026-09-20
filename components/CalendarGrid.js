@@ -106,6 +106,7 @@ export default function CalendarGrid({ year, month, eventsByDate, todayKey }) {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{e.title}</p>
                         <p className="truncate text-xs text-muted">{isIncome ? "Income" : e.categoryId?.name || "Uncategorized"}</p>
+                        {e.description ? <p className="truncate text-xs text-muted">{e.description}</p> : null}
                       </div>
                       <span className={`shrink-0 text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
                         {isIncome ? "+" : "-"}
@@ -145,6 +146,7 @@ export default function CalendarGrid({ year, month, eventsByDate, todayKey }) {
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold">{e.title}</p>
                                 <p className="truncate text-[11px] text-muted">{isIncome ? "Income" : e.categoryId?.name || "Uncategorized"}</p>
+                                {e.description ? <p className="truncate text-[11px] text-muted">{e.description}</p> : null}
                               </div>
                             </div>
                           </td>
