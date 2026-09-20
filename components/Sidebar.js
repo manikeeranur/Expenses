@@ -2,40 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  IconHome2,
-  IconReceipt2,
-  IconCategory2,
-  IconWallet,
-  IconChartPie,
-  IconTarget,
-  IconCoinRupee,
-  IconBuildingBank,
-  IconCalendar,
-  IconBulb,
-  IconBell,
-  IconSettings,
-  IconQrcode,
-} from "@tabler/icons-react";
 import { Plus, Wallet, PiggyBank } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import AddTransactionModal from "@/components/AddTransactionModal";
-
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: IconHome2 },
-  { href: "/transactions", label: "Transactions", icon: IconReceipt2 },
-  { href: "/categories", label: "Categories", icon: IconCategory2 },
-  { href: "/budgets", label: "Budgets", icon: IconWallet },
-  { href: "/reports", label: "Reports", icon: IconChartPie },
-  { href: "/goals", label: "Goals", icon: IconTarget },
-  { href: "/lending", label: "Lending", icon: IconCoinRupee },
-  { href: "/accounts", label: "Accounts", icon: IconBuildingBank },
-  { href: "/pay", label: "UPI Pay", icon: IconQrcode },
-  { href: "/calendar", label: "Calendar", icon: IconCalendar },
-  { href: "/insights", label: "Insights", icon: IconBulb },
-  { href: "/notifications", label: "Notifications", icon: IconBell },
-  { href: "/settings", label: "Settings", icon: IconSettings },
-];
+import { navItems } from "@/lib/navItems";
 
 export default function Sidebar() {
   const pathname = usePathname();

@@ -7,6 +7,7 @@ import Tag from "@/components/ui/Tag";
 import TransactionActionsMenu from "@/components/TransactionActionsMenu";
 import EditTransactionModal from "@/components/EditTransactionModal";
 import DownloadTransactionsPdf from "@/components/DownloadTransactionsPdf";
+import AddTransactionButton from "@/components/AddTransactionButton";
 import IncomeExpenseChart from "@/components/charts/IncomeExpenseChart";
 import { requireUserId } from "@/lib/session";
 import { getTransactions, getMonthlyIncomeExpense } from "@/lib/data";
@@ -78,6 +79,11 @@ function TransactionTable({ transactions, net }) {
           <span className={`text-xs font-bold ${net >= 0 ? "text-success" : "text-danger"}`}>{formatCurrencyPrecise(net)}</span>
         </span>
       </div>
+
+      <AddTransactionButton className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-primary px-7.5 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 md:hidden">
+        <Plus size={16} />
+        Add Transaction
+      </AddTransactionButton>
 
       {transactions.length ? (
         <>
@@ -221,13 +227,12 @@ export default async function TransactionsPage() {
           >
             <QrCode size={18} />
           </Link>
-          <Link
-            href="/transactions/add"
-            aria-label="Add transaction"
+          <AddTransactionButton
+            ariaLabel="Add transaction"
             className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/25"
           >
             <Plus size={18} />
-          </Link>
+          </AddTransactionButton>
         </div>
       </header>
 
@@ -278,13 +283,10 @@ export default async function TransactionsPage() {
           </div>
           <h2 className="mt-6 text-lg font-bold">No Transactions Yet</h2>
           <p className="mt-1 text-sm text-muted">Start by adding your first transaction.</p>
-          <Link
-            href="/transactions/add"
-            className="mt-6 flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25"
-          >
+          <AddTransactionButton className="mt-6 flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25">
             <Plus size={16} />
             Add Transaction
-          </Link>
+          </AddTransactionButton>
           <Link href="/transactions/pay" className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-primary">
             <QrCode size={14} />
             Pay via UPI

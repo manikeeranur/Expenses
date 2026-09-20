@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Calendar, Bell } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
 
-const PAGES = {
+export const PAGES = {
   "/dashboard": { title: "Dashboard", subtitle: "Overview of your monthly expenses" },
   "/transactions": { title: "Transactions", subtitle: "View and manage all your transactions" },
   "/categories": { title: "Categories", subtitle: "Track spending by category" },
