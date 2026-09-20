@@ -55,67 +55,109 @@ function TransactionTable({ transactions, net }) {
       </div>
 
       {transactions.length ? (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[420px] table-fixed border-collapse text-left">
-            <colgroup>
-              <col className="w-[50%]" />
-              <col className="w-[26%]" />
-              <col className="w-[15%]" />
-              <col className="w-[9%]" />
-            </colgroup>
-            <thead>
-              <tr className="border-b border-border">
-                <th className="pb-2 text-[11px] font-medium text-muted">Date</th>
-                <th className="pb-2 text-[11px] font-medium text-muted">Category</th>
-                <th className="pb-2 text-right text-[11px] font-medium text-muted">Amount</th>
-                <th className="pb-2 text-right text-[11px] font-medium text-muted">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {transactions.map((t) => {
-                const isIncome = t.type === "income";
-                const category = t.categoryId;
-                return (
-                  <tr key={t._id}>
-                    <td className="truncate py-3 text-sm text-muted">
-                      {formatDateShort(t.date)}
-                      <span className="block truncate text-[11px] text-muted">{t.title}</span>
-                    </td>
-                    <td className="py-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <CategoryIcon
-                          icon={isIncome ? "Landmark" : category?.icon}
-                          color={isIncome ? "#21C37E" : category?.color || "#9AA0B4"}
-                          size="sm"
-                        />
-                        <span className="truncate text-xs text-muted">
-                          {isIncome ? "Income" : category?.name || "Uncategorized"}
-                        </span>
-                        {PAYMENT_STATUS_TAG[t.paymentStatus] ? (
-                          <Tag tone={PAYMENT_STATUS_TAG[t.paymentStatus].tone}>{PAYMENT_STATUS_TAG[t.paymentStatus].label}</Tag>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td
-                      className={`truncate py-3 text-right text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}
-                    >
+        <>
+          {/* Card layout below md — the table's fixed columns squeeze too hard on phone widths */}
+          <div className="mt-3 divide-y divide-border md:hidden">
+            {transactions.map((t) => {
+              const isIncome = t.type === "income";
+              const category = t.categoryId;
+              return (
+                <div key={t._id} className="flex items-start gap-3 py-3">
+                  <CategoryIcon
+                    icon={isIncome ? "Landmark" : category?.icon}
+                    color={isIncome ? "#21C37E" : category?.color || "#9AA0B4"}
+                    size="sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{t.title}</p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-[11px] text-muted">{formatDateShort(t.date)}</span>
+                      <span className="text-[11px] text-muted">
+                        {isIncome ? "Income" : category?.name || "Uncategorized"}
+                      </span>
+                      {PAYMENT_STATUS_TAG[t.paymentStatus] ? (
+                        <Tag tone={PAYMENT_STATUS_TAG[t.paymentStatus].tone}>{PAYMENT_STATUS_TAG[t.paymentStatus].label}</Tag>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className={`text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
                       {isIncome ? "+" : "-"}
                       {formatCurrencyPrecise(t.amount)}
-                    </td>
-                    <td className="py-3">
-                      <div className="flex items-center justify-end">
-                        <TransactionActionsMenu
-                          editSlot={<EditTransactionModal transaction={t} />}
-                          deleteAction={deleteTransaction.bind(null, t._id)}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </span>
+                    <TransactionActionsMenu
+                      editSlot={<EditTransactionModal transaction={t} />}
+                      deleteAction={deleteTransaction.bind(null, t._id)}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Table layout from md up, where there's room for columns */}
+          <div className="mt-3 hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[420px] table-fixed border-collapse text-left">
+              <colgroup>
+                <col className="w-[50%]" />
+                <col className="w-[26%]" />
+                <col className="w-[15%]" />
+                <col className="w-[9%]" />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="pb-2 text-[11px] font-medium text-muted">Date</th>
+                  <th className="pb-2 text-[11px] font-medium text-muted">Category</th>
+                  <th className="pb-2 text-right text-[11px] font-medium text-muted">Amount</th>
+                  <th className="pb-2 text-right text-[11px] font-medium text-muted">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {transactions.map((t) => {
+                  const isIncome = t.type === "income";
+                  const category = t.categoryId;
+                  return (
+                    <tr key={t._id}>
+                      <td className="truncate py-3 text-sm text-muted">
+                        {formatDateShort(t.date)}
+                        <span className="block truncate text-[11px] text-muted">{t.title}</span>
+                      </td>
+                      <td className="py-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <CategoryIcon
+                            icon={isIncome ? "Landmark" : category?.icon}
+                            color={isIncome ? "#21C37E" : category?.color || "#9AA0B4"}
+                            size="sm"
+                          />
+                          <span className="truncate text-xs text-muted">
+                            {isIncome ? "Income" : category?.name || "Uncategorized"}
+                          </span>
+                          {PAYMENT_STATUS_TAG[t.paymentStatus] ? (
+                            <Tag tone={PAYMENT_STATUS_TAG[t.paymentStatus].tone}>{PAYMENT_STATUS_TAG[t.paymentStatus].label}</Tag>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td
+                        className={`truncate py-3 text-right text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}
+                      >
+                        {isIncome ? "+" : "-"}
+                        {formatCurrencyPrecise(t.amount)}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center justify-end">
+                          <TransactionActionsMenu
+                            editSlot={<EditTransactionModal transaction={t} />}
+                            deleteAction={deleteTransaction.bind(null, t._id)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : (
         <p className="mt-3 rounded-xl bg-background p-4 text-center text-xs text-muted">No transactions yet.</p>
       )}
