@@ -15,13 +15,17 @@ function StatCard({ icon, tone, label, value, valueClassName = "" }) {
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm shadow-black/[0.03]">
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones[tone] || tones.info}`}>
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs text-muted">{label}</p>
-        <p className={`mt-0.5 text-base font-bold ${valueClassName}`}>{value}</p>
+    <div className="rounded-2xl bg-surface p-3 shadow-sm shadow-black/[0.03] md:p-4">
+      <div className="flex flex-col items-start gap-1.5 md:flex-row md:items-center md:gap-3">
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl md:h-10 md:w-10 ${tones[tone] || tones.info}`}
+        >
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[10px] leading-tight text-muted md:text-xs">{label}</p>
+          <p className={`mt-0.5 truncate text-sm font-bold leading-tight md:text-base ${valueClassName}`}>{value}</p>
+        </div>
       </div>
     </div>
   );
@@ -54,7 +58,7 @@ export default async function CalendarPage({ searchParams }) {
       </header>
 
       <div className="space-y-4 px-4 pt-3 md:px-8 md:pt-6">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2 md:gap-4">
           <StatCard
             icon={<TrendingUp size={18} />}
             tone="success"

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { RefreshCw, Unlink, Landmark } from "lucide-react";
 import Tag from "@/components/ui/Tag";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { syncBankLink, disconnectBankLink } from "@/lib/actions/bank-link";
 import { formatCurrency, formatDate } from "@/lib/format";
 
@@ -20,6 +21,7 @@ export default function BankLinkCard({ link, account }) {
   const [syncing, startSync] = useTransition();
   const [disconnecting, startDisconnect] = useTransition();
   const [error, setError] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function handleSync() {
     setError(null);
@@ -30,8 +32,7 @@ export default function BankLinkCard({ link, account }) {
   }
 
   function handleDisconnect() {
-    if (!confirm("Disconnect this bank account? Already-imported transactions will be kept.")) return;
-    startDisconnect(() => disconnectBankLink(link._id));
+    setConfirmOpen(true);
   }
 
   const isActive = link.consentStatus === "ACTIVE";
@@ -81,6 +82,18 @@ export default function BankLinkCard({ link, account }) {
           {disconnecting ? "Disconnecting..." : "Disconnect"}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Disconnect this bank account?"
+        description="Already-imported transactions will be kept."
+        confirmLabel="Disconnect"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          startDisconnect(() => disconnectBankLink(link._id));
+        }}
+      />
     </div>
   );
 }

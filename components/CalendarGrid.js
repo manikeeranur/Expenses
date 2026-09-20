@@ -91,51 +91,82 @@ export default function CalendarGrid({ year, month, eventsByDate, todayKey }) {
           </div>
 
           {events.length ? (
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[420px] border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="pb-2 text-[11px] font-medium text-muted">Category</th>
-                    <th className="pb-2 text-right text-[11px] font-medium text-muted">Amount</th>
-                    <th className="pb-2 text-right text-[11px] font-medium text-muted">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {events.map((e) => {
-                    const isIncome = e.type === "income";
-                    return (
-                      <tr key={e._id}>
-                        <td className="py-3">
-                          <div className="flex items-center gap-2.5">
-                            <CategoryIcon
-                              icon={isIncome ? "Landmark" : e.categoryId?.icon}
-                              color={isIncome ? "#21C37E" : e.categoryId?.color || "#9AA0B4"}
-                              size="sm"
-                            />
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold">{e.title}</p>
-                              <p className="truncate text-[11px] text-muted">{isIncome ? "Income" : e.categoryId?.name || "Uncategorized"}</p>
+            <>
+              {/* Card layout below md */}
+              <div className="mt-3 space-y-2 md:hidden">
+                {events.map((e) => {
+                  const isIncome = e.type === "income";
+                  return (
+                    <div key={e._id} className="flex items-center gap-3 rounded-2xl bg-background p-3">
+                      <CategoryIcon
+                        icon={isIncome ? "Landmark" : e.categoryId?.icon}
+                        color={isIncome ? "#21C37E" : e.categoryId?.color || "#9AA0B4"}
+                        size="sm"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{e.title}</p>
+                        <p className="truncate text-xs text-muted">{isIncome ? "Income" : e.categoryId?.name || "Uncategorized"}</p>
+                      </div>
+                      <span className={`shrink-0 text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
+                        {isIncome ? "+" : "-"}
+                        {formatCurrency(e.amount)}
+                      </span>
+                      <TransactionActionsMenu
+                        editSlot={<EditTransactionModal transaction={e} />}
+                        deleteAction={deleteTransaction.bind(null, e._id)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Table layout from md up */}
+              <div className="mt-3 hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[420px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="pb-2 text-[11px] font-medium text-muted">Category</th>
+                      <th className="pb-2 text-right text-[11px] font-medium text-muted">Amount</th>
+                      <th className="pb-2 text-right text-[11px] font-medium text-muted">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {events.map((e) => {
+                      const isIncome = e.type === "income";
+                      return (
+                        <tr key={e._id}>
+                          <td className="py-3">
+                            <div className="flex items-center gap-2.5">
+                              <CategoryIcon
+                                icon={isIncome ? "Landmark" : e.categoryId?.icon}
+                                color={isIncome ? "#21C37E" : e.categoryId?.color || "#9AA0B4"}
+                                size="sm"
+                              />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">{e.title}</p>
+                                <p className="truncate text-[11px] text-muted">{isIncome ? "Income" : e.categoryId?.name || "Uncategorized"}</p>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className={`py-3 text-right text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
-                          {isIncome ? "+" : "-"}
-                          {formatCurrency(e.amount)}
-                        </td>
-                        <td className="py-3">
-                          <div className="flex items-center justify-end">
-                            <TransactionActionsMenu
-                              editSlot={<EditTransactionModal transaction={e} />}
-                              deleteAction={deleteTransaction.bind(null, e._id)}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td className={`py-3 text-right text-sm font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
+                            {isIncome ? "+" : "-"}
+                            {formatCurrency(e.amount)}
+                          </td>
+                          <td className="py-3">
+                            <div className="flex items-center justify-end">
+                              <TransactionActionsMenu
+                                editSlot={<EditTransactionModal transaction={e} />}
+                                deleteAction={deleteTransaction.bind(null, e._id)}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <p className="mt-3 rounded-xl bg-background p-4 text-center text-xs text-muted">
               No transactions on this day.

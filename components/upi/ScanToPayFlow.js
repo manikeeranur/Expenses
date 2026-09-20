@@ -3,6 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
 import { X, RefreshCw, Check } from "lucide-react";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { createQrCode, fetchQrPayments, closeQrCode } from "@/lib/actions/payments";
 import { formatCurrency, formatDateShort } from "@/lib/format";
 
@@ -12,6 +13,7 @@ export default function ScanToPayFlow({ activeQr, payments }) {
   const [checkMessage, setCheckMessage] = useState(null);
   const [closing, startClosing] = useTransition();
   const [closeMessage, setCloseMessage] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const qr = createState?.success
     ? {
@@ -33,11 +35,7 @@ export default function ScanToPayFlow({ activeQr, payments }) {
   }
 
   function handleClose() {
-    if (!confirm("Stop tracking this QR code in the app?")) return;
-    startClosing(async () => {
-      const res = await closeQrCode(qr._id);
-      if (res?.warning) setCloseMessage(res.warning);
-    });
+    setConfirmOpen(true);
   }
 
   return (
@@ -140,6 +138,20 @@ export default function ScanToPayFlow({ activeQr, payments }) {
           </button>
         </form>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Stop tracking this QR code in the app?"
+        confirmLabel="Close QR"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          startClosing(async () => {
+            const res = await closeQrCode(qr._id);
+            if (res?.warning) setCloseMessage(res.warning);
+          });
+        }}
+      />
     </div>
   );
 }
