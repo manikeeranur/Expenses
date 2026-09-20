@@ -71,44 +71,47 @@ export default function UpiQrScanner({ onScan }) {
 
   if (status === "denied") {
     return (
-      <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl bg-warning-light p-6 text-center">
+      <div className="flex aspect-square w-full max-w-xs flex-col items-center justify-center gap-2 rounded-3xl bg-warning-light p-6 text-center">
         <CameraOff size={28} className="text-warning" />
         <p className="text-sm font-medium">Camera access denied</p>
-        <p className="text-xs text-muted">Allow camera access in your browser settings, or enter the UPI ID manually below.</p>
+        <p className="text-xs text-muted">Allow camera access in your browser settings, or enter the UPI ID manually.</p>
       </div>
     );
   }
 
   if (status === "unsupported") {
     return (
-      <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-background p-6 text-center">
+      <div className="flex aspect-square w-full max-w-xs flex-col items-center justify-center gap-2 rounded-3xl border border-border p-6 text-center">
         <CameraOff size={28} className="text-muted" />
         <p className="text-sm font-medium">No camera found</p>
-        <p className="text-xs text-muted">Enter the UPI ID manually below.</p>
+        <p className="text-xs text-muted">Enter the UPI ID manually instead.</p>
       </div>
     );
   }
 
   if (status === "error") {
     return (
-      <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl bg-danger-light p-6 text-center">
+      <div className="flex aspect-square w-full max-w-xs flex-col items-center justify-center gap-2 rounded-3xl bg-danger-light p-6 text-center">
         <CameraOff size={28} className="text-danger" />
         <p className="text-sm font-medium text-danger">Could not start the camera</p>
-        <p className="text-xs text-muted">Enter the UPI ID manually below.</p>
+        <p className="text-xs text-muted">Enter the UPI ID manually instead.</p>
       </div>
     );
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-black">
-      <video ref={videoRef} className="aspect-square w-full object-cover" muted playsInline />
+    <div className="relative aspect-square w-full max-w-xs">
+      <video ref={videoRef} className="absolute inset-0 h-full w-full rounded-3xl object-cover" muted playsInline />
       {status === "starting" ? (
-        <p className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-black/80 py-3 text-xs text-white">
+        <p className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-2 text-xs text-white/80">
           <RefreshCw size={12} className="animate-spin" /> Starting camera…
         </p>
       ) : (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-10">
-          <div className="h-full w-full rounded-2xl border-2 border-white/70" />
+        <div className="pointer-events-none absolute -inset-1">
+          <span className="absolute left-0 top-0 h-11 w-11 rounded-tl-2xl border-l-4 border-t-4 border-danger" />
+          <span className="absolute right-0 top-0 h-11 w-11 rounded-tr-2xl border-r-4 border-t-4 border-warning" />
+          <span className="absolute bottom-0 left-0 h-11 w-11 rounded-bl-2xl border-b-4 border-l-4 border-info" />
+          <span className="absolute bottom-0 right-0 h-11 w-11 rounded-br-2xl border-b-4 border-r-4 border-success" />
         </div>
       )}
     </div>

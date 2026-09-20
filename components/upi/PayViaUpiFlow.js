@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { initiateUpiPayment, confirmUpiPayment } from "@/lib/actions/upi-pay";
-import { parseUpiUri, isValidUpiId, validateUpiUri, logUpiDebug, getAllUpiParams, buildUpiUri, UPI_DEBUG } from "@/lib/upi";
+import { parseUpiUri, isValidUpiId, validateUpiUri, logUpiDebug, getAllUpiParams, UPI_DEBUG } from "@/lib/upi";
 import { formatCurrency } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 
@@ -198,28 +198,6 @@ export default function PayViaUpiFlow({ categories }) {
     // user-gesture-driven deep link — no window.location/intent:// needed.
   }
 
-  // STEP 9 (dev-only debug tool): a minimal, freshly-built upi://pay link for
-  // the SAME payee at a trivial ₹1, built from scratch (ignoring anything the
-  // scanned QR carries beyond pa/pn). Isolates whether the Chrome→Android
-  // app-launch mechanism itself works at all, independent of this QR's
-  // extra parameters.
-  function handleDebugMinimalClick() {
-    const uri = buildUpiUri({ payeeUpiId: payeeUpi, payeeName, amount: 1, reference: "DEBUGTEST1" });
-    console.log("DEBUG_MINIMAL_UPI_URI", uri);
-    logUpiDebug("debug:minimal", { uri });
-  }
-
-  // STEP 10 (dev-only debug tool): the untouched original QR string, launched
-  // directly — no server round trip, no finalizeScannedUpiUri, no
-  // sanitizing, nothing. If THIS also fails in an app that succeeds when
-  // that same app scans the QR natively, the difference is how that app
-  // treats a browser-launched intent, not anything this code is doing to
-  // the payload — see the explanation printed alongside this button.
-  function handleDebugRawClick() {
-    console.log("DEBUG_RAW_QR_URI", scannedUri);
-    logUpiDebug("debug:raw", { uri: scannedUri });
-  }
-
   function resolvePayment(status) {
     setConfirmError(null);
     startConfirm(async () => {
@@ -242,30 +220,47 @@ export default function PayViaUpiFlow({ categories }) {
       </div>
 
       {step === "scan" ? (
-        <div className="mt-6 space-y-4">
-          <UpiQrScanner onScan={handleScan} />
-          {scanError ? <p className="text-xs font-medium text-danger">{scanError}</p> : null}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-          <div className="grid grid-cols-2 gap-3">
+        <div className="fixed inset-0 z-50 flex flex-col bg-background text-foreground">
+          <div className="flex items-center justify-between px-4 pb-2 pt-[calc(env(safe-area-inset-top)+14px)]">
+            <Link
+              href="/transactions"
+              aria-label="Cancel"
+              className="flex h-10 w-10 items-center justify-center rounded-full"
+            >
+              <X size={22} />
+            </Link>
+            <p className="text-sm font-medium">Scan QR to Pay</p>
+            <span className="h-10 w-10" />
+          </div>
+
+          <div className="flex flex-1 items-center justify-center px-10">
+            <UpiQrScanner onScan={handleScan} />
+          </div>
+
+          {scanError ? <p className="px-8 pb-2 text-center text-xs font-medium text-danger">{scanError}</p> : null}
+
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+          <div className="flex justify-center pb-6">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-border py-3 text-sm font-semibold"
+              className="flex items-center gap-2 rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium shadow-sm shadow-black/[0.03]"
             >
-              <Upload size={15} /> Upload QR Image
+              <Upload size={15} /> Upload from gallery
             </button>
+          </div>
+
+          <div className="rounded-t-3xl bg-surface px-6 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-3 text-center shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" />
+            <p className="text-sm font-medium">Scan any UPI QR code to pay</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/upi-logo.svg" alt="UPI" className="mx-auto mt-3 h-5 w-auto" />
             <button
               type="button"
               onClick={goToManualEntry}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-border py-3 text-sm font-semibold"
+              className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-muted"
             >
-              <KeyRound size={15} /> Enter Manually
+              <KeyRound size={13} /> Enter UPI ID manually instead
             </button>
           </div>
         </div>
@@ -341,39 +336,6 @@ export default function PayViaUpiFlow({ categories }) {
           >
             Review Payment
           </button>
-
-          {DEV ? (
-            <div className="rounded-2xl border border-dashed border-border p-3">
-              <p className="text-xs font-semibold text-muted">Developer test tools (NEXT_PUBLIC_UPI_DEBUG=1)</p>
-              <p className="mt-1 text-[11px] text-muted">
-                Use these to isolate the launch mechanism from the QR&apos;s own parameters. Both open your phone&apos;s
-                UPI app chooser directly — check your browser/remote-debug console for the exact URI each one sends.
-              </p>
-              <div className="mt-2 flex flex-col gap-2">
-                <a
-                  href={buildUpiUri({ payeeUpiId: payeeUpi, payeeName, amount: 1, reference: "DEBUGTEST1" })}
-                  onClick={handleDebugMinimalClick}
-                  className="rounded-xl border border-border py-2 text-center text-xs font-semibold"
-                >
-                  TEST UPI PAYMENT (₹1, minimal link)
-                </a>
-                {scannedUri ? (
-                  <a
-                    href={scannedUri}
-                    onClick={handleDebugRawClick}
-                    className="rounded-xl border border-border py-2 text-center text-xs font-semibold"
-                  >
-                    OPEN ORIGINAL QR UPI URI (unmodified)
-                  </a>
-                ) : null}
-              </div>
-              <p className="mt-2 text-[11px] text-muted">
-                If the ₹1 minimal link also fails in an app, the launch mechanism (or that app&apos;s handling of a
-                browser-triggered intent) is the problem, not QR parsing. If only the reconstructed payment fails but
-                the raw QR link succeeds, something is still altering the QR&apos;s bytes downstream.
-              </p>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
