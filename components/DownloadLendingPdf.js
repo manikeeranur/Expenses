@@ -1,209 +1,154 @@
 "use client";
 
 import { Download } from "lucide-react";
-import { formatDateShort, daysSince } from "@/lib/format";
+import { formatDateShort } from "@/lib/format";
+import { computeLendingStats } from "@/lib/lending";
 
-const GRAY = [130, 130, 140];
-const INK = [25, 25, 35];
-const BORDER = [220, 220, 226];
-const LABEL_FILL = [244, 244, 247];
+// The statement is in Tamil, which jsPDF's built-in fonts can't shape
+// (conjuncts and vowel signs come out broken). So the page is laid out as
+// plain HTML with Noto Sans Tamil, rasterized with html2canvas-pro (the
+// "-pro" fork understands Tailwind v4's oklch colors), and placed into the PDF.
 
-const SIZE_BODY = 9;
-const SIZE_SECTION = 11;
-const SIZE_TITLE = 18;
-const SIZE_CAPTION = 9;
+const PAGE_WIDTH_PX = 794; // A4 at 96dpi
+const PAGE_HEIGHT_PX = 1123;
+const FONT_HREF = "https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&display=swap";
+const FONT_FAMILY = "'Noto Sans Tamil', sans-serif";
 
-function formatAmountPdf(amount) {
-  return `Rs. ${Number(amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const INK = "#1f2937";
+const MUTED = "#6b7280";
+const BORDER = "#e5e7eb";
+const RULE = "#d1d5db";
+const GREEN = "#16a34a";
+const AMBER = "#d4a106";
+const RED = "#dc2626";
+
+const METHOD_LABELS = { upi: "UPI", cash: "Cash" };
+
+function formatAmountTa(amount) {
+  return `ரூ. ${Number(amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// jsPDF's built-in fonts can't render ₹ (it prints as a garbled superscript
-// glyph), so any free-text field the user typed (note, remarks) is sanitized
-// before it goes into the PDF, not just the amounts we format ourselves.
-function sanitizeForPdf(text) {
-  if (!text) return text;
-  return String(text).replace(/₹/g, "Rs. ");
+function escapeHtml(text) {
+  return String(text ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
-// A short prose line describing the principal side of the loan — mirrors
-// how a human would summarize it on a statement, not just a raw table row.
-function buildSettlementNarrative(lending, principalPayments, totalPrincipalPaid, outstanding) {
-  if (!principalPayments.length) {
-    return `No principal repayments have been recorded yet for ${lending.borrower}. The full principal of ${formatAmountPdf(
-      lending.principal
-    )} remains outstanding, as recorded in the lending sheet.`;
+async function ensureTamilFont() {
+  if (!document.querySelector(`link[href="${FONT_HREF}"]`)) {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = FONT_HREF;
+    document.head.appendChild(link);
+    await new Promise((resolve) => {
+      link.onload = resolve;
+      link.onerror = resolve;
+    });
   }
-  if (principalPayments.length === 1) {
-    const p = principalPayments[0];
-    return `${formatAmountPdf(p.amount)} of the principal was settled to ${lending.borrower} on ${formatDateShort(
-      p.date
-    )}, leaving ${formatAmountPdf(outstanding)} outstanding, as recorded in the lending sheet.`;
-  }
-  const last = principalPayments[principalPayments.length - 1];
-  return `A total of ${formatAmountPdf(totalPrincipalPaid)} has been settled across ${principalPayments.length} payments (latest on ${formatDateShort(
-    last.date
-  )}), leaving ${formatAmountPdf(outstanding)} outstanding, as recorded in the lending sheet.`;
+  // Load every weight we use before rasterizing, or the first export falls
+  // back to a system font.
+  await Promise.all(["400", "600", "700"].map((w) => document.fonts.load(`${w} 16px 'Noto Sans Tamil'`, "கடன்").catch(() => {})));
 }
 
-function keyValueTable(doc, autoTable, rows, startY, margin, contentWidth, labelWidthPct) {
-  autoTable(doc, {
-    startY,
-    margin: { left: margin, right: margin },
-    tableWidth: contentWidth,
-    theme: "grid",
-    body: rows,
-    styles: { fontSize: SIZE_BODY, textColor: INK, lineColor: BORDER, lineWidth: 0.2, cellPadding: 3 },
-    columnStyles: {
-      0: { cellWidth: contentWidth * labelWidthPct, fillColor: LABEL_FILL, textColor: INK, fontStyle: "bold" },
-      1: { halign: "right", fontStyle: "bold" },
-    },
-  });
-  return doc.lastAutoTable.finalY;
+function summaryRow(label, value, valueStyle = "") {
+  return `
+    <tr>
+      <td style="padding:12px 6px;color:${MUTED};border-bottom:1px solid ${BORDER};">${label}</td>
+      <td style="padding:12px 6px;text-align:right;border-bottom:1px solid ${BORDER};${valueStyle}">${value}</td>
+    </tr>`;
 }
 
-function paymentTable(doc, autoTable, payments, startY, margin, contentWidth, emptyLabel) {
-  autoTable(doc, {
-    startY,
-    margin: { left: margin, right: margin },
-    tableWidth: contentWidth,
-    theme: "grid",
-    head: [["Date", "Method", "Remarks", "Amount"]],
-    body: payments.length
-      ? payments.map((p) => [formatDateShort(p.date), p.method === "upi" ? "UPI" : "Cash", sanitizeForPdf(p.remarks) || "—", formatAmountPdf(p.amount)])
-      : [["—", "—", emptyLabel, "—"]],
-    styles: { fontSize: SIZE_BODY, textColor: INK, lineColor: BORDER, lineWidth: 0.2, cellPadding: 3 },
-    headStyles: { fillColor: LABEL_FILL, textColor: INK, fontStyle: "bold" },
-    columnStyles: { 3: { halign: "right" } },
-  });
-  return doc.lastAutoTable.finalY;
+function paymentSection(title, payments, total) {
+  const rows = payments.length
+    ? payments
+        .map(
+          (p) => `
+      <tr>
+        <td style="padding:12px 6px;border-bottom:1px solid ${BORDER};">${formatDateShort(p.date)}</td>
+        <td style="padding:12px 6px;border-bottom:1px solid ${BORDER};">${METHOD_LABELS[p.method] || "Cash"}</td>
+        <td style="padding:12px 6px;border-bottom:1px solid ${BORDER};text-align:right;">${formatAmountTa(p.amount)}</td>
+      </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="3" style="padding:14px 6px;color:${MUTED};text-align:center;border-bottom:1px solid ${BORDER};">பதிவுகள் இல்லை</td></tr>`;
+
+  return `
+    <h2 style="margin:40px 0 12px;font-size:14px;font-weight:600;color:${INK};">${title}</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="color:${MUTED};font-size:12px;">
+          <th style="padding:8px 6px;text-align:left;font-weight:400;border-bottom:2px solid ${RULE};width:36%;">தேதி</th>
+          <th style="padding:8px 6px;text-align:left;font-weight:400;border-bottom:2px solid ${RULE};">முறை</th>
+          <th style="padding:8px 6px;text-align:right;font-weight:400;border-bottom:2px solid ${RULE};">தொகை</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr style="font-weight:700;">
+          <td style="padding:12px 6px;border-top:2px solid ${RULE};" colspan="2">மொத்தம்</td>
+          <td style="padding:12px 6px;border-top:2px solid ${RULE};text-align:right;">${formatAmountTa(total)}</td>
+        </tr>
+      </tfoot>
+    </table>`;
 }
 
-function sectionHeading(doc, text, margin, y) {
-  doc.setFont(undefined, "bold");
-  doc.setFontSize(SIZE_SECTION);
-  doc.setTextColor(...INK);
-  doc.text(text, margin, y);
-  return y + 5;
-}
+function buildStatementHtml(lending) {
+  const byDate = (a, b) => new Date(a.date) - new Date(b.date);
+  const interestPayments = lending.payments.filter((p) => p.type === "interest").sort(byDate);
+  const principalPayments = lending.payments.filter((p) => p.type === "principal").sort(byDate);
+  const { totalInterest, totalPrincipalRepaid, outstanding, expectedMonthlyInterest } = computeLendingStats(lending);
+  const rate = lending.interestRatePercent || 0;
 
-function drawFooter(doc, margin, contentWidth, pageHeight) {
-  const y = pageHeight - 14;
-  doc.setDrawColor(...BORDER);
-  doc.setLineWidth(0.3);
-  doc.line(margin, y - 5, margin + contentWidth, y - 5);
+  return `
+    <div style="flex:1;">
+      <h1 style="margin:0;text-align:center;font-size:14px;font-weight:700;color:${INK};">கடன் அறிக்கை</h1>
+      <div style="width:46px;height:3px;background:${INK};margin:14px auto 30px;border-radius:2px;"></div>
 
-  doc.setFontSize(SIZE_BODY);
-  doc.setTextColor(...GRAY);
-  doc.setFont(undefined, "normal");
-  doc.text(`Generated on ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`, margin, y);
+      <table style="width:100%;border-collapse:collapse;font-size:12px;border-top:2px solid ${RULE};">
+        ${summaryRow("கடன் பெற்றவர்", escapeHtml(lending.borrower), "font-weight:700;")}
+        ${summaryRow("தொடர்பு எண்", escapeHtml(lending.mobile || "—"))}
+        ${summaryRow("கடன் வழங்கிய தேதி", formatDateShort(lending.dateGiven))}
+        ${summaryRow("அசல் தொகை", formatAmountTa(lending.principal), `color:${GREEN};font-weight:700;`)}
+        ${summaryRow("செலுத்தப்பட்ட அசல்", formatAmountTa(totalPrincipalRepaid), `color:${AMBER};font-weight:700;`)}
+        ${summaryRow("நிலுவைத் தொகை", formatAmountTa(outstanding), `color:${RED};font-weight:700;`)}
+        ${summaryRow("வட்டி விகிதம்", `${rate}% / மாதம் (${formatAmountTa(expectedMonthlyInterest)})`, `color:${RED};font-weight:700;`)}
+        ${summaryRow("வசூலான வட்டி", formatAmountTa(totalInterest))}
+      </table>
 
-  doc.setFont(undefined, "bold");
-  doc.setTextColor(...INK);
-  doc.text("Monthly Expenses", margin + contentWidth, y, { align: "right" });
+      ${paymentSection("வட்டி செலுத்துதல்கள்", interestPayments, totalInterest)}
+      ${paymentSection("அசல் செலுத்துதல்கள்", principalPayments, totalPrincipalRepaid)}
+    </div>
+    <p style="margin:40px 0 0;text-align:center;font-size:12px;color:${MUTED};">உருவாக்கப்பட்ட தேதி: ${formatDateShort(new Date())}</p>`;
 }
 
 async function generateLendingPdf(lending) {
-  const { jsPDF } = await import("jspdf");
-  const { default: autoTable } = await import("jspdf-autotable");
+  const [{ jsPDF }, { default: html2canvas }] = await Promise.all([import("jspdf"), import("html2canvas-pro")]);
+  await ensureTamilFont();
 
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const margin = 10;
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const contentWidth = pageWidth - margin * 2;
+  // Off-screen A4-width page; min-height pins the footer to the bottom of
+  // page one when the statement is short.
+  const page = document.createElement("div");
+  page.style.cssText = `position:fixed;left:-10000px;top:0;width:${PAGE_WIDTH_PX}px;min-height:${PAGE_HEIGHT_PX}px;box-sizing:border-box;padding:48px;display:flex;flex-direction:column;background:#fff;color:${INK};font-family:${FONT_FAMILY};line-height:1.4;`;
+  page.innerHTML = buildStatementHtml(lending);
+  document.body.appendChild(page);
 
-  const interestPayments = [...lending.payments].filter((p) => p.type === "interest").sort((a, b) => new Date(a.date) - new Date(b.date));
-  const principalPayments = [...lending.payments].filter((p) => p.type === "principal").sort((a, b) => new Date(a.date) - new Date(b.date));
-  const totalInterest = interestPayments.reduce((s, p) => s + p.amount, 0);
-  const totalPrincipalPaid = principalPayments.reduce((s, p) => s + p.amount, 0);
-  const outstanding = Math.max(0, lending.principal - totalPrincipalPaid);
-  const expectedMonthlyInterest = Math.round((outstanding * (lending.interestRatePercent || 0)) / 100);
-  const isClosed = lending.status === "closed";
+  try {
+    const canvas = await html2canvas(page, { scale: 2, backgroundColor: "#ffffff" });
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const pdfWidth = doc.internal.pageSize.getWidth();
+    const pdfHeight = doc.internal.pageSize.getHeight();
+    const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+    const img = canvas.toDataURL("image/jpeg", 0.95);
 
-  let y = 14;
+    // Long payment histories run past one page: shift the same image up by
+    // one page height per extra page.
+    for (let offset = 0; offset < imgHeight - 0.5; offset += pdfHeight) {
+      if (offset > 0) doc.addPage();
+      doc.addImage(img, "JPEG", 0, -offset, pdfWidth, imgHeight);
+    }
 
-  doc.setFont(undefined, "bold");
-  doc.setFontSize(SIZE_CAPTION);
-  doc.setTextColor(...GRAY);
-  doc.setCharSpace(0.8);
-  doc.text("MONTHLY EXPENSES", pageWidth / 2, y, { align: "center" });
-  doc.setCharSpace(0);
-  y += 9;
-
-  doc.setFontSize(SIZE_TITLE);
-  doc.setTextColor(...INK);
-  doc.setCharSpace(1);
-  doc.text("LENDING STATEMENT", pageWidth / 2, y, { align: "center" });
-  doc.setCharSpace(0);
-  y += 6;
-
-  doc.setFont(undefined, "normal");
-  doc.setFontSize(SIZE_CAPTION);
-  doc.setTextColor(...GRAY);
-  doc.text("Detailed statement of lending, repayments and interest", pageWidth / 2, y, { align: "center" });
-  y += 10;
-
-  y = keyValueTable(
-    doc,
-    autoTable,
-    [
-      ["Borrower", lending.borrower],
-      ["Status", isClosed ? "CLOSED" : "ACTIVE"],
-      ["Given on", `${formatDateShort(lending.dateGiven)} • ${daysSince(lending.dateGiven)} days ago`],
-      ["Contact", lending.mobile || "No mobile number"],
-    ],
-    y,
-    margin,
-    contentWidth,
-    0.35
-  );
-  y += 8;
-
-  y = sectionHeading(doc, "LOAN SUMMARY", margin, y);
-  y = keyValueTable(
-    doc,
-    autoTable,
-    [
-      ["Principal", formatAmountPdf(lending.principal)],
-      ["Principal Paid", formatAmountPdf(totalPrincipalPaid)],
-      ["Outstanding", formatAmountPdf(outstanding)],
-      ["Interest Collected", formatAmountPdf(totalInterest)],
-      ["Interest Rate", `${lending.interestRatePercent || 0}% / month`],
-      ["Expected Monthly Interest", formatAmountPdf(expectedMonthlyInterest)],
-    ],
-    y,
-    margin,
-    contentWidth,
-    0.5
-  );
-  y += 8;
-
-  y = sectionHeading(doc, "SETTLEMENT DETAILS", margin, y);
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    tableWidth: contentWidth,
-    theme: "grid",
-    body: [[buildSettlementNarrative(lending, principalPayments, totalPrincipalPaid, outstanding)]],
-    styles: { fontSize: SIZE_BODY, textColor: INK, lineColor: BORDER, lineWidth: 0.2, cellPadding: 4 },
-  });
-  y = doc.lastAutoTable.finalY + 8;
-
-  y = sectionHeading(doc, "INTEREST PAYMENTS", margin, y);
-  y = paymentTable(doc, autoTable, interestPayments, y, margin, contentWidth, "No interest payments logged yet.");
-  y += 8;
-
-  y = sectionHeading(doc, "PRINCIPAL PAYMENTS", margin, y);
-  paymentTable(doc, autoTable, principalPayments, y, margin, contentWidth, "No principal payments logged yet.");
-
-  // Same footer on every page, not just the last one.
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    drawFooter(doc, margin, contentWidth, pageHeight);
+    doc.save(`lending-${lending.borrower.trim().replace(/\s+/g, "-")}.pdf`);
+  } finally {
+    page.remove();
   }
-
-  doc.save(`lending-${lending.borrower.trim().replace(/\s+/g, "-")}.pdf`);
 }
 
 export default function DownloadLendingPdf({ lending }) {
