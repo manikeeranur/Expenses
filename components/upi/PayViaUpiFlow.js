@@ -11,7 +11,7 @@ import CategorySelect from "@/components/ui/CategorySelect";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { recordUpiPayment, lookupPayee } from "@/lib/actions/upi-pay";
-import { parseUpiUri, isValidUpiId, buildUpiUri, toGooglePayIntentUrl, logUpiDebug, getAllUpiParams } from "@/lib/upi";
+import { parseUpiUri, isValidUpiId, buildUpiUri, toGooglePayUrl, logUpiDebug, getAllUpiParams } from "@/lib/upi";
 import { formatCurrency } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 
@@ -20,10 +20,12 @@ import { useMounted } from "@/lib/useMounted";
 // camera scan on its own.
 //
 // The payment handed to Google Pay is kept as "pending" until the user says
-// whether it went through. It's mirrored to sessionStorage because Android
-// can discard this tab while Google Pay is in front; the page then reloads
-// on return, and this is how it still knows what to save. The in-memory copy
-// keeps the flow working when sessionStorage is unavailable.
+// whether it went through; `opened` flips once this page actually loses focus
+// to the app, and only then is the "did it go through?" screen shown. It's
+// mirrored to sessionStorage because Android can discard this tab while
+// Google Pay is in front; the page then reloads on return, and this is how it
+// still knows what to save. The in-memory copy keeps the flow working when
+// sessionStorage is unavailable.
 const PENDING_KEY = "upi-pay-pending";
 let memoryPending = null;
 const pendingListeners = new Set();
@@ -50,6 +52,11 @@ function writePending(value) {
     // Storage blocked — memoryPending still covers this page session.
   }
   pendingListeners.forEach((listener) => listener());
+}
+
+function readPendingPayment() {
+  const raw = readPending();
+  return raw ? JSON.parse(raw) : null;
 }
 
 function decodeQrFromFile(file) {
@@ -91,6 +98,8 @@ export default function PayViaUpiFlow({ categories }) {
   const [categoryId, setCategoryId] = useState(categories[0]?._id || "");
   const [scanError, setScanError] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState(null);
+  // { status: "opening" | "failed", via: "gpay" | "chooser" } after a pay tap.
+  const [launch, setLaunch] = useState(null);
   const fileInputRef = useRef(null);
 
   const pendingRaw = useSyncExternalStore(subscribePending, readPending, () => null);
@@ -117,6 +126,7 @@ export default function PayViaUpiFlow({ categories }) {
     setFixedAmount(parsed.am);
     setUpiUri(parsed.raw);
     setScanError("");
+    setLaunch(null);
     setStep("pay");
 
     // The QR's own "pn" is often a generic aggregator/POS name ("Paytm"),
@@ -141,6 +151,7 @@ export default function PayViaUpiFlow({ categories }) {
     if (saved?.categoryId) setCategoryId(saved.categoryId);
     setFixedAmount(null);
     setUpiUri(buildUpiUri({ payeeUpiId: upiId, payeeName: name }));
+    setLaunch(null);
     setStep("pay");
   }
 
@@ -169,12 +180,47 @@ export default function PayViaUpiFlow({ categories }) {
       .catch(() => setQrDataUrl(null));
   }, [step, isMobile, upiUri]);
 
-  // Runs inside the link's own click, so the link's navigation still opens
-  // Google Pay as a direct result of the tap; this only remembers what to
-  // save when the user comes back.
-  function startPayment() {
-    logUpiDebug("launch", { upiUri, googlePayUrl: isAndroid ? toGooglePayIntentUrl(upiUri) : null });
-    writePending({ payeeUpi, payeeName, amount: fixedAmount, upiUri, categoryId });
+  // A tapped link that opens nothing must not jump to "did it go through?",
+  // so the payment only counts as handed off once this page is hidden or
+  // loses focus. Android's app chooser is a dialog over Chrome that may only
+  // blur the page, never hide it — so blur counts too, and the chooser gets
+  // longer than a direct Google Pay launch before showing "didn't open".
+  // Listeners stay on after that message, in case the app opens late.
+  useEffect(() => {
+    if (!launch) return;
+    function markOpened() {
+      const current = readPendingPayment();
+      if (current && !current.opened) writePending({ ...current, opened: true });
+    }
+    function handleVisibility() {
+      if (document.visibilityState === "hidden") markOpened();
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("blur", markOpened);
+    window.addEventListener("pagehide", markOpened);
+    const timer =
+      launch.status === "opening"
+        ? setTimeout(
+            () => {
+              if (!readPendingPayment()?.opened) setLaunch({ ...launch, status: "failed" });
+            },
+            launch.via === "chooser" ? 8000 : 3000
+          )
+        : null;
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("blur", markOpened);
+      window.removeEventListener("pagehide", markOpened);
+    };
+  }, [launch]);
+
+  // Runs inside the link's own click without preventDefault, so the link
+  // itself opens the app as a direct result of the tap.
+  function startPayment(via) {
+    logUpiDebug("launch", { via, upiUri });
+    writePending({ payeeUpi, payeeName, amount: fixedAmount, upiUri, categoryId, opened: via === "desktop" });
+    if (via !== "desktop") setLaunch({ status: "opening", via });
   }
 
   function retryPayment() {
@@ -183,6 +229,7 @@ export default function PayViaUpiFlow({ categories }) {
     setFixedAmount(pending.amount);
     setUpiUri(pending.upiUri);
     setCategoryId(pending.categoryId);
+    setLaunch(null);
     setStep("pay");
     writePending(null);
   }
@@ -210,7 +257,7 @@ export default function PayViaUpiFlow({ categories }) {
           </span>
           <p className="mt-4 text-lg font-bold">Payment saved</p>
         </div>
-      ) : pending ? (
+      ) : pending?.opened ? (
         <form action={saveAction} className="mt-6 space-y-4">
           <input type="hidden" name="payeeUpiId" value={pending.payeeUpi} />
           <input type="hidden" name="upiUri" value={pending.upiUri} />
@@ -269,7 +316,7 @@ export default function PayViaUpiFlow({ categories }) {
         </form>
       ) : null}
 
-      {!pending && !saveState?.success && step === "pay" ? (
+      {!pending?.opened && !saveState?.success && step === "pay" ? (
         <div className="mt-10 flex flex-col items-center text-center">
           <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-light text-2xl font-bold text-primary-dark">
             {(payeeName || payeeUpi).charAt(0).toUpperCase()}
@@ -282,17 +329,25 @@ export default function PayViaUpiFlow({ categories }) {
             <p className="mt-5 text-xs text-muted">You&apos;ll enter the amount in Google Pay</p>
           )}
 
+          {launch?.status === "failed" ? (
+            <p className="mt-6 w-full max-w-xs rounded-2xl bg-warning-light p-3 text-xs text-warning">
+              {launch.via === "gpay"
+                ? "Google Pay didn't open. Check it's installed and up to date, or use another UPI app below."
+                : "No UPI app opened. Try again, or check a UPI app is installed."}
+            </p>
+          ) : null}
+
           {isMobile ? (
             <>
               <a
-                href={isAndroid ? toGooglePayIntentUrl(upiUri) : upiUri}
-                onClick={startPayment}
+                href={isAndroid ? toGooglePayUrl(upiUri) : upiUri}
+                onClick={() => startPayment(isAndroid ? "gpay" : "chooser")}
                 className="mt-8 flex w-full max-w-xs items-center justify-center rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25"
               >
                 {isAndroid ? "Pay with Google Pay" : "Open UPI app to pay"}
               </a>
               {isAndroid ? (
-                <a href={upiUri} onClick={startPayment} className="mt-4 text-xs font-semibold text-muted">
+                <a href={upiUri} onClick={() => startPayment("chooser")} className="mt-4 text-xs font-semibold text-muted">
                   Use another UPI app
                 </a>
               ) : null}
@@ -306,7 +361,7 @@ export default function PayViaUpiFlow({ categories }) {
               ) : null}
               <button
                 type="button"
-                onClick={startPayment}
+                onClick={() => startPayment("desktop")}
                 className="mt-5 flex w-full max-w-xs items-center justify-center rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25"
               >
                 I&apos;ve paid — save it
@@ -314,13 +369,20 @@ export default function PayViaUpiFlow({ categories }) {
             </>
           )}
 
-          <button type="button" onClick={() => setStep("scan")} className="mt-6 text-xs font-semibold text-primary">
+          <button
+            type="button"
+            onClick={() => {
+              setLaunch(null);
+              setStep("scan");
+            }}
+            className="mt-6 text-xs font-semibold text-primary"
+          >
             Scan a different QR
           </button>
         </div>
       ) : null}
 
-      {!pending && !saveState?.success && step === "scan" ? (
+      {!pending?.opened && !saveState?.success && step === "scan" ? (
         <div className="fixed inset-0 z-50 flex flex-col bg-background text-foreground">
           <div className="flex items-center justify-between px-4 pb-2 pt-[calc(env(safe-area-inset-top)+14px)]">
             <Link
@@ -367,7 +429,7 @@ export default function PayViaUpiFlow({ categories }) {
         </div>
       ) : null}
 
-      {!pending && !saveState?.success && step === "manual" ? (
+      {!pending?.opened && !saveState?.success && step === "manual" ? (
         <div className="mt-6 space-y-4">
           <div>
             <Label>Payee UPI ID</Label>
