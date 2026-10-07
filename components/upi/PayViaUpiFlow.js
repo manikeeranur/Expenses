@@ -1,30 +1,56 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { X, Check, Camera, KeyRound, Copy, Upload, ShieldCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, Check, Camera, KeyRound, Upload } from "lucide-react";
 import jsQR from "jsqr";
 import QRCode from "qrcode";
 import UpiQrScanner from "@/components/upi/UpiQrScanner";
 import CategorySelect from "@/components/ui/CategorySelect";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { initiateUpiPayment, confirmUpiPayment, lookupPayeeName } from "@/lib/actions/upi-pay";
-import { parseUpiUri, isValidUpiId, validateUpiUri, logUpiDebug, getAllUpiParams, UPI_DEBUG } from "@/lib/upi";
+import { recordUpiPayment, lookupPayee } from "@/lib/actions/upi-pay";
+import { parseUpiUri, isValidUpiId, buildUpiUri, toGooglePayIntentUrl, logUpiDebug, getAllUpiParams } from "@/lib/upi";
 import { formatCurrency } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 
-// Every UPI-compliant app (Google Pay, PhonePe, Paytm, BHIM, Union Bank's own
-// app, etc.) registers itself as a handler for the generic "upi://pay"
-// scheme — that registration is what makes it "UPI-compliant" under NPCI's
-// spec. So the correct way to let the user pick ANY installed app is to
-// navigate to "upi://pay?..." directly and let Android's own OS-level intent
-// chooser list every app that can handle it. Hard-coding a specific app's
-// private scheme (tez://, phonepe://, paytmmp://, …) bypasses that chooser,
-// locks the picker to whatever apps happen to be in this list, and isn't
-// needed — it used to exist here purely as a menu of shortcuts.
-const DEV = UPI_DEBUG;
+// Scan → one tap → Google Pay → back here to save it. The tap can't be
+// skipped: Chrome only opens another app from a user's tap, never from a
+// camera scan on its own.
+//
+// The payment handed to Google Pay is kept as "pending" until the user says
+// whether it went through. It's mirrored to sessionStorage because Android
+// can discard this tab while Google Pay is in front; the page then reloads
+// on return, and this is how it still knows what to save. The in-memory copy
+// keeps the flow working when sessionStorage is unavailable.
+const PENDING_KEY = "upi-pay-pending";
+let memoryPending = null;
+const pendingListeners = new Set();
+
+function subscribePending(listener) {
+  pendingListeners.add(listener);
+  return () => pendingListeners.delete(listener);
+}
+
+function readPending() {
+  try {
+    return sessionStorage.getItem(PENDING_KEY) ?? memoryPending;
+  } catch {
+    return memoryPending;
+  }
+}
+
+function writePending(value) {
+  memoryPending = value ? JSON.stringify(value) : null;
+  try {
+    if (memoryPending) sessionStorage.setItem(PENDING_KEY, memoryPending);
+    else sessionStorage.removeItem(PENDING_KEY);
+  } catch {
+    // Storage blocked — memoryPending still covers this page session.
+  }
+  pendingListeners.forEach((listener) => listener());
+}
 
 function decodeQrFromFile(file) {
   return new Promise((resolve, reject) => {
@@ -50,83 +76,72 @@ function decodeQrFromFile(file) {
 }
 
 export default function PayViaUpiFlow({ categories }) {
+  const router = useRouter();
   const mounted = useMounted();
   const isMobile = mounted && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isAndroid = mounted && /Android/i.test(navigator.userAgent);
 
-  const [step, setStep] = useState("scan"); // scan, manual, details, confirm
+  const [step, setStep] = useState("scan"); // scan, manual, pay
   const [payeeUpi, setPayeeUpi] = useState("");
   const [payeeName, setPayeeName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
+  // Set only when the QR itself fixes the amount; otherwise it's typed in
+  // Google Pay, exactly as when scanning there.
+  const [fixedAmount, setFixedAmount] = useState(null);
+  const [upiUri, setUpiUri] = useState("");
   const [categoryId, setCategoryId] = useState(categories[0]?._id || "");
   const [scanError, setScanError] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState(null);
-  const [confirming, startConfirm] = useTransition();
-  const [confirmError, setConfirmError] = useState(null);
-  const [confirmNote, setConfirmNote] = useState("");
-  const [finalStatus, setFinalStatus] = useState(null);
-  // appOpened: user tapped the single "Pay with UPI" link and the browser
-  // handed off to Android's app chooser. returnedToTab: this page regained
-  // visibility afterwards (the user switched back, either mid-payment or
-  // after finishing) — we still can't tell which, hence PENDING not SUCCESS.
-  const [appOpened, setAppOpened] = useState(false);
-  const [returnedToTab, setReturnedToTab] = useState(false);
-  const [launchError, setLaunchError] = useState(null);
-  const [scannedUri, setScannedUri] = useState(null);
-  const [amountLocked, setAmountLocked] = useState(false);
   const fileInputRef = useRef(null);
 
-  const [initState, initiateAction, initiating] = useActionState(initiateUpiPayment, undefined);
+  const pendingRaw = useSyncExternalStore(subscribePending, readPending, () => null);
+  const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+
+  const [saveState, saveAction, saving] = useActionState((_prev, formData) => recordUpiPayment(formData), undefined);
+
+  useEffect(() => {
+    if (!saveState?.success) return;
+    writePending(null);
+    router.replace("/transactions");
+  }, [saveState, router]);
 
   const handleScan = useCallback((text) => {
-    if (DEV) console.log("ORIGINAL_QR_PAYLOAD", text);
     const parsed = parseUpiUri(text);
     if (!parsed) {
       logUpiDebug("scan:rejected", { originalQrPayload: text });
       setScanError("That QR doesn't look like a UPI payment code. Try again or enter details manually.");
       return;
     }
-    logUpiDebug("scan:parsed", {
-      originalQrPayload: text,
-      parsedUpiUri: parsed.raw,
-      pa: parsed.pa,
-      pn: parsed.pn,
-      am: parsed.am,
-      cu: parsed.cu,
-      tn: parsed.tn,
-      tr: parsed.tr,
-      mc: parsed.mc,
-      // Every param the QR actually carries, including ones this app doesn't
-      // otherwise use (mode, purpose, orgid, sign, refUrl, …) — see STEP 2.
-      allParams: getAllUpiParams(parsed.raw),
-    });
+    logUpiDebug("scan:parsed", { originalQrPayload: text, allParams: getAllUpiParams(parsed.raw) });
     setPayeeUpi(parsed.pa);
     setPayeeName(parsed.pn || "");
-    if (parsed.am) setAmount(String(parsed.am));
-    if (parsed.tn) setNote(parsed.tn);
-    setScannedUri(parsed.raw);
-    setAmountLocked(parsed.am != null);
+    setFixedAmount(parsed.am);
+    setUpiUri(parsed.raw);
     setScanError("");
-    setStep("details");
+    setStep("pay");
 
-    // The QR's own "pn" is often a generic aggregator/POS name, not the real
-    // business name — if this UPI ID was renamed on a past payment, prefer
-    // that over whatever this scan just gave us.
-    lookupPayeeName(parsed.pa).then((res) => {
+    // The QR's own "pn" is often a generic aggregator/POS name ("Paytm"),
+    // not the real business name — if this UPI ID was renamed on a past
+    // payment, prefer that, and reuse the category from last time.
+    lookupPayee(parsed.pa).then((res) => {
       if (res?.name) setPayeeName(res.name);
+      if (res?.categoryId) setCategoryId(res.categoryId);
     });
   }, []);
 
   function goToManualEntry() {
-    setScannedUri(null);
-    setAmountLocked(false);
     setStep("manual");
   }
 
   async function continueFromManual() {
-    const saved = await lookupPayeeName(payeeUpi.trim());
-    if (saved?.name && !payeeName.trim()) setPayeeName(saved.name);
-    setStep("details");
+    const upiId = payeeUpi.trim();
+    const saved = await lookupPayee(upiId);
+    const name = payeeName.trim() || saved?.name || "";
+    setPayeeUpi(upiId);
+    setPayeeName(name);
+    if (saved?.categoryId) setCategoryId(saved.categoryId);
+    setFixedAmount(null);
+    setUpiUri(buildUpiUri({ payeeUpiId: upiId, payeeName: name }));
+    setStep("pay");
   }
 
   async function handleFileUpload(e) {
@@ -145,94 +160,167 @@ export default function PayViaUpiFlow({ categories }) {
     }
   }
 
-  const awaitingConfirmation = Boolean(initState?.success);
-  const showLaunchScreen = awaitingConfirmation && !finalStatus && isMobile && !appOpened;
-
-  // The 7 states this flow can be in. Only INITIATED/APP_OPENED/PENDING are
-  // ever inferred client-side — SUCCESS/CANCELLED come from the user's own
-  // explicit answer, never assumed just because the UPI app opened (see
-  // lib/upi.js for why the browser can't observe the real outcome).
-  const paymentState = !awaitingConfirmation
-    ? null
-    : finalStatus === "paid"
-      ? "SUCCESS"
-      : finalStatus === "cancelled"
-        ? "CANCELLED"
-        : launchError
-          ? "FAILED"
-          : confirmError
-            ? "UNKNOWN"
-            : returnedToTab
-              ? "PENDING"
-              : appOpened
-                ? "APP_OPENED"
-                : "INITIATED";
-
+  // Desktop can't open a UPI app — show the payment as a QR to scan with the
+  // phone instead.
   useEffect(() => {
-    if (paymentState) logUpiDebug("state", paymentState);
-  }, [paymentState]);
-
-  useEffect(() => {
-    if (!awaitingConfirmation || !initState?.upiUri) return;
-    QRCode.toDataURL(initState.upiUri, { margin: 1, width: 220 })
+    if (step !== "pay" || isMobile || !upiUri) return;
+    QRCode.toDataURL(upiUri, { margin: 1, width: 220 })
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(null));
-  }, [awaitingConfirmation, initState]);
+  }, [step, isMobile, upiUri]);
 
-  // Detects "the user came back to this tab" so an app-opened payment can be
-  // shown as PENDING instead of silently staying APP_OPENED forever — it does
-  // NOT mean the payment succeeded, only that we can now ask the user.
-  useEffect(() => {
-    if (!appOpened || finalStatus) return;
-    function handleVisibility() {
-      if (document.visibilityState === "visible") setReturnedToTab(true);
-    }
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [appOpened, finalStatus]);
-
-  // Fires directly inside the <a>'s click handler — a same-tick response to
-  // the user's own tap, not a callback queued after some unrelated async
-  // work — which is what lets Android Chrome treat the upi://pay navigation
-  // as a trusted user gesture and hand off to the OS app chooser.
-  function handleLaunchClick(e) {
-    const uri = initState?.upiUri;
-    const check = validateUpiUri(uri);
-    logUpiDebug("launch", { finalUpiUri: uri, valid: check.valid, reason: check.reason });
-    if (!check.valid) {
-      e.preventDefault();
-      setLaunchError(`Couldn't verify this payment link (${check.reason}). Please rescan the QR code.`);
-      return;
-    }
-    setLaunchError(null);
-    setAppOpened(true);
-    // No e.preventDefault(): the anchor's own href navigation is what opens
-    // the UPI app, so the browser handles it as a direct, top-level,
-    // user-gesture-driven deep link — no window.location/intent:// needed.
+  // Runs inside the link's own click, so the link's navigation still opens
+  // Google Pay as a direct result of the tap; this only remembers what to
+  // save when the user comes back.
+  function startPayment() {
+    logUpiDebug("launch", { upiUri, googlePayUrl: isAndroid ? toGooglePayIntentUrl(upiUri) : null });
+    writePending({ payeeUpi, payeeName, amount: fixedAmount, upiUri, categoryId });
   }
 
-  function resolvePayment(status) {
-    setConfirmError(null);
-    startConfirm(async () => {
-      const res = await confirmUpiPayment(initState.transactionId, status, confirmNote);
-      if (res?.error) setConfirmError(res.error);
-      else setFinalStatus(status);
-    });
+  function retryPayment() {
+    setPayeeUpi(pending.payeeUpi);
+    setPayeeName(pending.payeeName);
+    setFixedAmount(pending.amount);
+    setUpiUri(pending.upiUri);
+    setCategoryId(pending.categoryId);
+    setStep("pay");
+    writePending(null);
   }
 
   const canContinueManual = isValidUpiId(payeeUpi.trim());
-  const canContinueDetails = amount && Number(amount) > 0;
 
   return (
     <div className="mx-auto max-w-xl px-4 pb-10 pt-6 md:pt-10">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold">Pay via UPI</h1>
-        <Link href="/transactions" aria-label="Cancel" className="flex h-8 w-8 items-center justify-center rounded-full bg-surface">
+        <Link
+          href="/transactions"
+          onClick={() => writePending(null)}
+          aria-label="Cancel"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-surface"
+        >
           <X size={16} />
         </Link>
       </div>
 
-      {step === "scan" ? (
+      {saveState?.success ? (
+        <div className="mt-16 flex flex-col items-center text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-success-light">
+            <Check size={28} className="text-success" />
+          </span>
+          <p className="mt-4 text-lg font-bold">Payment saved</p>
+        </div>
+      ) : pending ? (
+        <form action={saveAction} className="mt-6 space-y-4">
+          <input type="hidden" name="payeeUpiId" value={pending.payeeUpi} />
+          <input type="hidden" name="upiUri" value={pending.upiUri} />
+
+          <div className="rounded-2xl bg-surface p-4 text-center shadow-sm shadow-black/[0.03]">
+            <p className="text-sm font-semibold">Did the payment go through?</p>
+            <p className="mt-1 text-xs text-muted">Save it once Google Pay shows it as paid — this app can&apos;t check with the bank.</p>
+          </div>
+
+          <div>
+            <Label>Paid to</Label>
+            <Input name="payeeName" defaultValue={pending.payeeName} placeholder={pending.payeeUpi} />
+            <p className="mt-1.5 text-xs text-muted">{pending.payeeUpi} · rename it here if the QR shows the wrong name</p>
+          </div>
+          <div>
+            <Label>Amount paid</Label>
+            <div className="flex items-center gap-1 rounded-2xl border border-border bg-background px-4 py-3 focus-within:border-primary">
+              <span className="text-sm text-muted">₹</span>
+              <input
+                name="amount"
+                defaultValue={pending.amount ?? ""}
+                readOnly={pending.amount != null}
+                autoFocus={pending.amount == null}
+                type="number"
+                inputMode="decimal"
+                min="0.01"
+                step="0.01"
+                required
+                placeholder="0"
+                className={`w-full bg-transparent text-sm outline-none ${pending.amount != null ? "text-muted" : ""}`}
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Category</Label>
+            <CategorySelect categories={categories} defaultValue={pending.categoryId} />
+          </div>
+
+          {saveState?.error ? <p className="text-xs font-medium text-danger">{saveState.error}</p> : null}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex w-full items-center justify-center rounded-2xl bg-success py-3.5 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Yes, save payment"}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={retryPayment}
+            className="flex w-full items-center justify-center rounded-2xl border border-border py-3 text-sm font-semibold disabled:opacity-60"
+          >
+            Didn&apos;t go through — try again
+          </button>
+        </form>
+      ) : null}
+
+      {!pending && !saveState?.success && step === "pay" ? (
+        <div className="mt-10 flex flex-col items-center text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-light text-2xl font-bold text-primary-dark">
+            {(payeeName || payeeUpi).charAt(0).toUpperCase()}
+          </span>
+          <p className="mt-3 max-w-full truncate text-lg font-bold">{payeeName || payeeUpi}</p>
+          <p className="mt-0.5 max-w-full truncate text-xs text-muted">{payeeUpi}</p>
+          {fixedAmount != null ? (
+            <p className="mt-5 text-3xl font-bold">{formatCurrency(fixedAmount)}</p>
+          ) : (
+            <p className="mt-5 text-xs text-muted">You&apos;ll enter the amount in Google Pay</p>
+          )}
+
+          {isMobile ? (
+            <>
+              <a
+                href={isAndroid ? toGooglePayIntentUrl(upiUri) : upiUri}
+                onClick={startPayment}
+                className="mt-8 flex w-full max-w-xs items-center justify-center rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25"
+              >
+                {isAndroid ? "Pay with Google Pay" : "Open UPI app to pay"}
+              </a>
+              {isAndroid ? (
+                <a href={upiUri} onClick={startPayment} className="mt-4 text-xs font-semibold text-muted">
+                  Use another UPI app
+                </a>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="mt-8 text-xs text-muted">Scan this with Google Pay on your phone, then save it here.</p>
+              {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrDataUrl} alt="UPI payment QR code" width={200} height={200} className="mt-3 rounded-xl" />
+              ) : null}
+              <button
+                type="button"
+                onClick={startPayment}
+                className="mt-5 flex w-full max-w-xs items-center justify-center rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25"
+              >
+                I&apos;ve paid — save it
+              </button>
+            </>
+          )}
+
+          <button type="button" onClick={() => setStep("scan")} className="mt-6 text-xs font-semibold text-primary">
+            Scan a different QR
+          </button>
+        </div>
+      ) : null}
+
+      {!pending && !saveState?.success && step === "scan" ? (
         <div className="fixed inset-0 z-50 flex flex-col bg-background text-foreground">
           <div className="flex items-center justify-between px-4 pb-2 pt-[calc(env(safe-area-inset-top)+14px)]">
             <Link
@@ -279,7 +367,7 @@ export default function PayViaUpiFlow({ categories }) {
         </div>
       ) : null}
 
-      {step === "manual" ? (
+      {!pending && !saveState?.success && step === "manual" ? (
         <div className="mt-6 space-y-4">
           <div>
             <Label>Payee UPI ID</Label>
@@ -307,247 +395,6 @@ export default function PayViaUpiFlow({ categories }) {
         </div>
       ) : null}
 
-      {step === "details" ? (
-        <div className="mt-6 space-y-4">
-          <div>
-            <Label>Payee Name</Label>
-            <Input
-              value={payeeName}
-              onChange={(e) => setPayeeName(e.target.value)}
-              placeholder={payeeUpi}
-            />
-            <p className="mt-1.5 text-xs text-muted">
-              {payeeUpi}
-              {scannedUri ? " · this QR's own label — edit it if it looks wrong, it won't change where the money goes" : ""}
-            </p>
-          </div>
-          <div>
-            <Label>Amount</Label>
-            <div className="flex items-center gap-1 rounded-2xl border border-border bg-background px-4 py-3 focus-within:border-primary">
-              <span className="text-sm text-muted">₹</span>
-              <input
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                type="number"
-                min="1"
-                step="0.01"
-                placeholder="0"
-                readOnly={amountLocked}
-                className={`w-full bg-transparent text-sm outline-none ${amountLocked ? "text-muted" : ""}`}
-              />
-            </div>
-            {amountLocked ? <p className="mt-1.5 text-xs text-muted">Amount is fixed by this QR code.</p> : null}
-          </div>
-          <div>
-            <Label>Category</Label>
-            <CategorySelect categories={categories} defaultValue={categoryId} onValueChange={setCategoryId} />
-          </div>
-          <div>
-            <Label>Note (optional)</Label>
-            <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What's it for?" />
-            {scannedUri ? (
-              <p className="mt-1.5 text-xs text-muted">This is just for your own records — it doesn&apos;t change what&apos;s sent to the UPI app.</p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            disabled={!canContinueDetails}
-            onClick={() => setStep("confirm")}
-            className="flex w-full items-center justify-center rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 disabled:opacity-50"
-          >
-            Review Payment
-          </button>
-        </div>
-      ) : null}
-
-      {step === "confirm" && !awaitingConfirmation ? (
-        <form action={initiateAction} className="mt-6 space-y-4">
-          <input type="hidden" name="payeeUpiId" value={payeeUpi} />
-          <input type="hidden" name="payeeName" value={payeeName} />
-          <input type="hidden" name="amount" value={amount} />
-          <input type="hidden" name="note" value={note} />
-          <input type="hidden" name="categoryId" value={categoryId} />
-          <input type="hidden" name="scannedUri" value={scannedUri || ""} />
-
-          <div className="rounded-2xl bg-surface p-5 shadow-sm shadow-black/[0.03]">
-            <p className="text-center text-xs text-muted">You&apos;re paying</p>
-            <p className="mt-1 text-center text-3xl font-bold">{formatCurrency(Number(amount) || 0)}</p>
-            <div className="mt-5 space-y-2.5">
-              <ConfirmRow label="Payee" value={payeeName || payeeUpi} />
-              <ConfirmRow label="UPI ID" value={payeeUpi} />
-              <ConfirmRow label="Category" value={categories.find((c) => c._id === categoryId)?.name || "Uncategorized"} />
-              {note ? <ConfirmRow label="Note" value={note} /> : null}
-            </div>
-          </div>
-
-          {initState?.error ? <p className="text-xs font-medium text-danger">{initState.error}</p> : null}
-
-          <p className="text-xs text-muted">
-            This opens your UPI app to complete the payment. It&apos;s only recorded as Paid once you confirm it went through —
-            opening the app alone doesn&apos;t count.
-          </p>
-
-          <div className="flex items-center gap-3 rounded-2xl bg-black p-3.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
-              <ShieldCheck size={20} className="text-white" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white">Use the CRED app</p>
-              <p className="text-xs text-white/60">For the smoothest, most reliable UPI payment experience</p>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={initiating}
-            className="flex w-full items-center justify-center rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 disabled:opacity-60"
-          >
-            {initiating ? "Preparing…" : `Pay ${formatCurrency(Number(amount) || 0)} via UPI`}
-          </button>
-        </form>
-      ) : null}
-
-      {showLaunchScreen ? (
-        <div className="mt-6">
-          <div className="rounded-2xl bg-surface p-4 text-center">
-            <p className="text-sm text-muted">Pay</p>
-            <p className="mt-1 text-2xl font-bold">{formatCurrency(initState.amount)}</p>
-            <p className="mt-1 text-sm text-muted">to {initState.payeeName}</p>
-          </div>
-          {launchError ? <p className="mt-4 text-xs font-medium text-danger">{launchError}</p> : null}
-          {/* A real <a href="upi://pay?..."> click, not window.location/intent:// —
-              this is what lets Android Chrome hand off to its own OS-level app
-              chooser, listing every installed UPI-compliant app (Google Pay,
-              PhonePe, Paytm, BHIM, your bank's app, …) rather than a fixed list
-              this code picks for you. */}
-          <a
-            href={initState.upiUri}
-            onClick={handleLaunchClick}
-            className="mt-5 flex w-full items-center justify-center rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/25"
-          >
-            Open UPI App to Pay {formatCurrency(initState.amount)}
-          </a>
-          <p className="mt-4 text-center text-xs text-muted">
-            Your phone will ask which app to use — pick any UPI app you have installed.
-          </p>
-        </div>
-      ) : awaitingConfirmation ? (
-        <div className="mt-10 flex flex-col items-center text-center">
-          {finalStatus ? (
-            <>
-              <span
-                className={`flex h-16 w-16 items-center justify-center rounded-full ${
-                  finalStatus === "paid" ? "bg-success-light" : "bg-danger-light"
-                }`}
-              >
-                <Check size={28} className={finalStatus === "paid" ? "text-success" : "text-danger"} />
-              </span>
-              <p className="mt-4 text-lg font-bold">{finalStatus === "paid" ? "Marked as Paid" : "Marked as Cancelled"}</p>
-              <p className="mt-1 text-sm text-muted">Reference {initState.reference}</p>
-              <Link
-                href="/transactions"
-                className="mt-8 flex w-full max-w-xs items-center justify-center rounded-2xl bg-primary py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25"
-              >
-                Back to Transactions
-              </Link>
-            </>
-          ) : (
-            <>
-              <p className="text-sm font-medium">
-                {!isMobile
-                  ? "Ready to pay"
-                  : returnedToTab
-                    ? "Welcome back — we still can't tell if the payment went through. Please confirm below."
-                    : "Complete the payment in your UPI app. Do not close this page until you return."}
-              </p>
-              <p className="mt-3 text-2xl font-bold">{formatCurrency(initState.amount)}</p>
-              <p className="mt-1 text-sm text-muted">to {initState.payeeName}</p>
-
-              <div className="mt-6 flex w-full flex-col items-center gap-3 rounded-2xl border border-border p-4">
-                <p className="text-xs text-muted">
-                  {isMobile
-                    ? "If nothing opened, scan this QR with your UPI app instead, or copy the details below."
-                    : "UPI apps can't open from a desktop browser. Scan this QR with your phone to complete the payment."}
-                </p>
-                {qrDataUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={qrDataUrl} alt="UPI payment QR code" width={200} height={200} className="rounded-xl" />
-                ) : null}
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard?.writeText(initState.upiUri)}
-                    className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold"
-                  >
-                    <Copy size={13} /> Copy UPI Link
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard?.writeText(payeeUpi)}
-                    className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold"
-                  >
-                    <Copy size={13} /> Copy UPI ID
-                  </button>
-                </div>
-              </div>
-
-              <p className="mt-8 text-xs font-medium text-muted">Did the payment go through?</p>
-              <p className="mt-1 text-xs text-muted">
-                This app has no way to verify that with the bank — it can only record what you tell it here.
-              </p>
-              <input
-                value={confirmNote}
-                onChange={(e) => setConfirmNote(e.target.value)}
-                placeholder="UTR/reference number, or reason if it failed (optional)"
-                className="mt-3 w-full max-w-xs rounded-xl border border-border bg-background px-3 py-2 text-xs outline-none placeholder:text-muted focus:border-primary"
-              />
-              {confirmError ? <p className="mt-2 text-xs font-medium text-danger">{confirmError}</p> : null}
-              <div className="mt-3 flex w-full max-w-xs gap-3">
-                <button
-                  type="button"
-                  disabled={confirming}
-                  onClick={() => resolvePayment("paid")}
-                  className="flex-1 rounded-2xl bg-success py-3 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  Yes, Payment Completed
-                </button>
-                <button
-                  type="button"
-                  disabled={confirming}
-                  onClick={() => resolvePayment("cancelled")}
-                  className="flex-1 rounded-2xl border border-border py-3 text-sm font-semibold disabled:opacity-60"
-                >
-                  No, Cancelled
-                </button>
-              </div>
-
-              {isMobile ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAppOpened(false);
-                    setReturnedToTab(false);
-                    setLaunchError(null);
-                  }}
-                  className="mt-4 text-xs font-semibold text-primary"
-                >
-                  Open UPI app again
-                </button>
-              ) : null}
-            </>
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }
-
-function ConfirmRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-muted">{label}</span>
-      <span className="max-w-[60%] truncate text-right font-medium">{value}</span>
-    </div>
-  );
-}
-
